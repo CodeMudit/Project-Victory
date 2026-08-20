@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROJECT NEXUS // ASSESSMENT NODE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=VT323&display=swap" rel="stylesheet">
+  <style>
+    /* ANTI-CHEAT HARDENING */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+    }
+
+    body {
+      background-color: #030806;
+      color: #00ff66;
+      font-family: 'VT323', monospace;
+      font-size: 23px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      text-shadow: 0 0 7px rgba(0, 255, 102, 0.5);
+      overflow-x: hidden;
+    }
+
+    /* Scanlines & Vignette */
+    .crt-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%);
+      background-size: 100% 4px;
+      z-index: 100;
+    }
+
+    .crt-vignette {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      pointer-events: none;
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+      z-index: 101;
+    }
+
+    .terminal-card {
+      width: 100%;
+      max-width: 860px;
+      background: rgba(2, 18, 8, 0.95);
+      border: 2px solid #00ff66;
+      box-shadow: 0 0 30px rgba(0, 255, 102, 0.25);
+      border-radius: 6px;
+      padding: 30px;
+      position: relative;
+      z-index: 5;
+    }
+
+    .header-bar {
+      border-bottom: 1px dashed #00ff66;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 17px;
+    }
+
+    .timer-badge {
+      color: #ffff00;
+      font-size: 26px;
+      font-family: 'VT323', monospace;
+    }
+
+    .timer-warning {
+      color: #ff3333 !important;
+      animation: pulse 0.7s infinite alternate;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
+
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .opt-btn {
+      background: rgba(0, 35, 10, 0.7);
+      border: 1px solid #00ff66;
+      color: #00ff66;
+      font-family: 'VT323', monospace;
+      font-size: 23px;
+      padding: 12px 18px;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .opt-btn:hover {
+      background: #00ff66;
+      color: #030806;
+      text-shadow: none;
+    }
+
+    input[type="text"], input[type="password"] {
+      background: rgba(0, 20, 5, 0.8);
+      border: 1px solid #00ff66;
+      outline: none;
+      color: #00ff66;
+      font-family: 'VT323', monospace;
+      font-size: 24px;
+      padding: 10px 15px;
+      width: 100%;
+      text-transform: uppercase;
+      margin: 10px 0;
+    }
+
+    .action-btn {
+      background: #00ff66;
+      color: #030806;
+      border: none;
+      font-family: 'VT323', monospace;
+      font-size: 24px;
+      padding: 10px 24px;
+      cursor: pointer;
+      font-weight: bold;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .action-btn:hover { background: #33ff88; }
+    .hidden { display: none !important; }
+    .warning-text { color: #ff3333; margin-top: 10px; font-size: 19px; }
+
+    /* Strike Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.92);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 200; padding: 20px;
+    }
+
+    .modal-box {
+      background: rgba(30, 0, 0, 0.98);
+      border: 3px solid #ff3333;
+      box-shadow: 0 0 40px rgba(255, 51, 51, 0.8);
+      border-radius: 6px;
+      padding: 30px;
+      max-width: 600px;
+      text-align: center;
+      color: #ff3333;
+    }
+  </style>
+</head>
+<body oncontextmenu="return false;">
+  <div class="crt-overlay"></div>
+  <div class="crt-vignette"></div>
+
+  <!-- SCREEN 1: SECURE AUTH GATEWAY -->
+  <div class="terminal-card" id="loginScreen">
+    <div class="header-bar">
+      <div>PROJECT NEXUS // SYSTEM GATEWAY</div>
+      <div>ROUND <span id="loginRoundNum">1</span></div>
+    </div>
+    <p>&gt; ENTER AUTHORIZED CREDENTIALS DISPATCHED BY FACILITATORS.</p>
+    <input type="text" id="loginTeamId" placeholder="TEAM ID (E.G. NEX-4920)" autocomplete="off">
+    <input type="password" id="loginPass" placeholder="ACCESS KEY / PASSWORD" autocomplete="off">
+    <button class="action-btn" id="loginBtn">AUTHENTICATE & COMMENCE</button>
+    <div id="loginMsg" class="warning-text"></div>
+  </div>
+
+  <!-- SCREEN 2: ACTIVE ASSESSMENT TERMINAL -->
+  <div class="terminal-card hidden" id="quizScreen">
+    <div class="header-bar">
+      <div id="teamDisplay">TEAM: ---</div>
+      <div id="progressDisplay">NODE 1/--</div>
+      <div class="timer-badge" id="timer">45s</div>
+    </div>
+
+    <div id="questionText" style="font-size: 25px; min-height: 55px; line-height: 1.3;"></div>
+    
+    <div class="options-grid" id="optionsContainer"></div>
+
+    <div id="textInputContainer" class="hidden">
+      <input type="text" id="blankInput" placeholder="TYPE ANSWER & PRESS ENTER">
+      <button class="action-btn" id="submitTextBtn">CONFIRM ANSWER</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: RESULT & REAL-TIME BROADCAST -->
+  <div class="terminal-card hidden" id="endScreen">
+    <div class="header-bar">
+      <div>TRANSMISSION SUMMARY // PROJECT NEXUS</div>
+    </div>
+    <p id="endStatus">&gt; LOGS SYNCED TO CENTRAL REPOSITORY.</p>
+    <p id="subReason" style="margin-top: 10px; color: #ffff00;"></p>
+    
+    <div id="eliminationStatusArea" style="margin-top: 25px; border-top: 1px dashed #00ff66; padding-top: 15px;">
+      <p id="waitingMsg">&gt; STANDING BY: POLLING CENTRAL NETWORK FOR UNIVERSAL ROUND COMPLETION...</p>
+    </div>
+  </div>
+
+  <!-- WARNING MODAL (ROUND 1 STRIKE 1) -->
+  <div id="warningModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2 style="font-family:'Orbitron'; font-size: 26px; margin-bottom: 12px;">[!] SECURITY BREACH WARNING</h2>
+      <p style="color: #fff; margin-bottom: 20px; font-size: 21px;">TAB SWITCH DETECTED (STRIKE 1/2).<br>A SECOND TAB SWITCH WILL FORCE-TERMINATE YOUR TEST IMMEDIATELY.</p>
+      <button class="action-btn" style="background:#ff3333; color:#000;" id="dismissWarningBtn">ACKNOWLEDGE & RESUME</button>
+    </div>
+  </div>
+
+  <script>
+    // Set your Railway backend domain or local endpoint
+    const BACKEND_URL = "http://127.0.0.1:8000";
+
+    let questions = [];
+    let currentQIdx = 0;
+    let timerInterval = null;
+    let totalTimerInterval = null;
+    let timeLeft = 45;
+    let totalSecondsElapsed = 0;
+    let teamId = "";
+    let teamPassword = "";
+    let activeRound = 1;
+    const answers = {};
+    let tabSwitchCount = 0;
+    let quizActive = false;
+    let isSubmitting = false;
+
+    // Login Handler
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const idInput = document.getElementById('loginTeamId').value.trim().toUpperCase();
+      const passInput = document.getElementById('loginPass').value.trim();
+      const msg = document.getElementById('loginMsg');
+
+      if (!idInput || !passInput) {
+        msg.innerText = "[!] TEAM ID AND PASSWORD REQUIRED.";
+        return;
+      }
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team_id: idInput, password: passInput, target_round: activeRound })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          msg.innerText = `[!] ${data.detail || "Authentication Failed."}`;
+          return;
+        }
+
+        teamId = data.team_id;
+        teamPassword = passInput;
+        activeRound = data.current_round;
+
+        // Fetch questions dynamically from Database
+        const qRes = await fetch(`${BACKEND_URL}/api/questions/${activeRound}`);
+        const qData = await qRes.json();
+        questions = qData.questions || [];
+
+        if (questions.length === 0) {
+          msg.innerText = "[!] ERROR: NO QUESTIONS CONFIGURED FOR THIS ROUND BY ADMIN.";
+          return;
+        }
+
+        document.getElementById('teamDisplay').innerText = `TEAM: ${data.team_name} (${teamId})`;
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('quizScreen').classList.remove('hidden');
+        quizActive = true;
+
+        totalTimerInterval = setInterval(() => totalSecondsElapsed++, 1000);
+        loadQuestion();
+      } catch (err) {
+        msg.innerText = "[!] BACKEND UNREACHABLE. CHECK SERVER.";
+      }
+    });
+
+    // Anti-Cheat Hardening
+    document.addEventListener('copy', (e) => e.preventDefault());
+    document.addEventListener('cut', (e) => e.preventDefault());
+    document.addEventListener('paste', (e) => e.preventDefault());
+
+    // Strict Multi-Round Tab Switch Enforcement
+    document.addEventListener('visibilitychange', () => {
+      if (!quizActive || isSubmitting) return;
+
+      if (document.hidden) {
+        tabSwitchCount++;
+        if (activeRound === 1) {
+          if (tabSwitchCount >= 2) {
+            finishQuiz("TERMINATED_DUE_TO_TAB_SWITCHING");
+          }
+        } else {
+          // Zero tolerance on advanced rounds
+          finishQuiz("DISQUALIFIED");
+        }
+      } else {
+        if (activeRound === 1 && tabSwitchCount === 1 && !isSubmitting) {
+          document.getElementById('warningModal').classList.remove('hidden');
+        }
+      }
+    });
+
+    document.getElementById('dismissWarningBtn').addEventListener('click', () => {
+      document.getElementById('warningModal').classList.add('hidden');
+    });
+
+    function loadQuestion() {
+      if (currentQIdx >= questions.length) {
+        finishQuiz("NORMAL_COMPLETION");
+        return;
+      }
+
+      clearInterval(timerInterval);
+      timeLeft = 45;
+      updateTimerDisplay();
+
+      const q = questions[currentQIdx];
+      document.getElementById('progressDisplay').innerText = `NODE ${currentQIdx + 1}/${questions.length}`;
+      document.getElementById('questionText').innerText = q.text;
+
+      const optContainer = document.getElementById('optionsContainer');
+      const textContainer = document.getElementById('textInputContainer');
+      const blankInput = document.getElementById('blankInput');
+
+      if (q.type === 'mcq') {
+        textContainer.classList.add('hidden');
+        optContainer.classList.remove('hidden');
+        optContainer.innerHTML = '';
+
+        q.options.forEach(opt => {
+          const btn = document.createElement('button');
+          btn.className = 'opt-btn';
+          btn.innerText = `[${opt.k}] ${opt.t}`;
+          btn.onclick = () => selectAnswer(q.id, opt.k);
+          optContainer.appendChild(btn);
+        });
+      } else {
+        optContainer.classList.add('hidden');
+        textContainer.classList.remove('hidden');
+        blankInput.value = '';
+        blankInput.focus();
+
+        const submitText = () => selectAnswer(q.id, blankInput.value.trim());
+        document.getElementById('submitTextBtn').onclick = submitText;
+        blankInput.onkeydown = (e) => { if (e.key === 'Enter') submitText(); };
+      }
+
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay();
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          selectAnswer(q.id, "TIMEOUT");
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const timerEl = document.getElementById('timer');
+      timerEl.innerText = `${timeLeft}s`;
+      if (timeLeft <= 10) timerEl.classList.add('timer-warning');
+      else timerEl.classList.remove('timer-warning');
+    }
+
+    function selectAnswer(qId, val) {
+      clearInterval(timerInterval);
+      answers[qId] = val;
+      currentQIdx++;
+      loadQuestion();
+    }
+
+    async function finishQuiz(statusReason = "NORMAL_COMPLETION") {
+      if (isSubmitting) return;
+      isSubmitting = true;
+      quizActive = false;
+      clearInterval(timerInterval);
+      clearInterval(totalTimerInterval);
+
+      document.getElementById('warningModal').classList.add('hidden');
+      document.getElementById('quizScreen').classList.add('hidden');
+      document.getElementById('endScreen').classList.remove('hidden');
+
+      if (statusReason === "DISQUALIFIED") {
+        document.getElementById('subReason').innerText = "> NOTICE: IMMEDIATE DISQUALIFICATION TRIGGERED (ROUND 2+ ZERO-TOLERANCE BREACH).";
+      } else if (statusReason === "TERMINATED_DUE_TO_TAB_SWITCHING") {
+        document.getElementById('subReason').innerText = "> NOTICE: SESSION FORCE-TERMINATED (STRIKE 2 EXCEEDED).";
+      }
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/submit-quiz`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            team_id: teamId,
+            password: teamPassword,
+            round_number: activeRound,
+            answers: answers,
+            tab_switch_count: tabSwitchCount,
+            time_taken_seconds: totalSecondsElapsed,
+            submission_status: statusReason
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById('endStatus').innerText = `> SUCCESS: NODE DATA TRANSMITTED. SCORE: ${data.score} PTS.`;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+
+      startUniversalStatusPolling();
+    }
+
+    function startUniversalStatusPolling() {
+      const pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/team/status/${teamId}`);
+          const data = await res.json();
+          
+          if (data.all_teams_finished) {
+            clearInterval(pollInterval);
+            const statusArea = document.getElementById('eliminationStatusArea');
+            if (data.status === "ELIMINATED") {
+              statusArea.innerHTML = `
+                <div style="background: rgba(45,0,0,0.85); border: 2px solid #ff3333; padding: 20px; text-align: center; color: #ff3333;">
+                  <h2 style="font-family:'Orbitron'; font-size: 26px;">[X] TOURNAMENT ELIMINATION NOTICE</h2>
+                  <p style="color: #fff; margin-top: 10px; font-size: 20px;">ALL TEAMS HAVE CONCLUDED THE CURRENT ROUND.<br>BASED ON FINAL SCORES AND TIE-BREAKER PARAMETERS, YOUR TEAM HAS NOT ADVANCED.</p>
+                </div>
+              `;
+            } else {
+              statusArea.innerHTML = `
+                <div style="background: rgba(0,40,15,0.85); border: 2px solid #00ff66; padding: 20px; text-align: center; color: #00ff66;">
+                  <h2 style="font-family:'Orbitron'; font-size: 26px;">[✓] ADVANCEMENT CONFIRMED</h2>
+                  <p style="color: #fff; margin-top: 10px; font-size: 20px;">ALL TEAMS HAVE FINISHED. YOUR TEAM HAS BEEN PROMOTED TO ROUND ${data.current_round}.</p>
+                </div>
+              `;
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }, 4000);
+    }
+  </script>
+</body>
+</html>

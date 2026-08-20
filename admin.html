@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROJECT NEXUS // COMMAND MATRIX</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #03070d;
+      color: #00ffcc;
+      font-family: 'Share Tech Mono', monospace;
+      padding: 24px;
+      font-size: 15px;
+    }
+    h1, h2, h3 { font-family: 'Orbitron', sans-serif; color: #00ffcc; text-shadow: 0 0 10px rgba(0,255,204,0.5); }
+    h1 { font-size: 26px; margin-bottom: 20px; border-bottom: 1px solid #00ffcc44; padding-bottom: 10px; }
+    h2 { font-size: 18px; margin-bottom: 12px; }
+    .layout-grid { display: grid; grid-template-columns: 1.1fr 1.9fr; gap: 20px; }
+    .card {
+      background: rgba(8, 18, 30, 0.95);
+      border: 1px solid #00ffcc;
+      border-radius: 6px;
+      padding: 20px;
+      box-shadow: 0 0 15px rgba(0,255,204,0.15);
+      margin-bottom: 20px;
+    }
+    input, button, select, textarea {
+      font-family: 'Share Tech Mono', monospace;
+      padding: 10px 12px;
+      background: #040a12;
+      border: 1px solid #00ffcc;
+      color: #00ffcc;
+      font-size: 15px;
+      width: 100%;
+      margin-bottom: 10px;
+      border-radius: 3px;
+    }
+    button {
+      background: #00ffcc;
+      color: #03070d;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+    button:hover { background: #66ffdd; box-shadow: 0 0 10px #00ffcc; }
+    .btn-danger { background: #ff3366; color: #fff; }
+    .btn-danger:hover { background: #ff6688; box-shadow: 0 0 10px #ff3366; }
+    .btn-warning { background: #ffaa00; color: #000; }
+    .q-item-card {
+      background: rgba(0, 30, 40, 0.6);
+      border: 1px dashed #00ffcc88;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #00ffcc33; padding: 8px 10px; text-align: left; }
+    th { background: #002220; color: #00ffcc; }
+    .rank-1 { color: #ffff00; font-weight: bold; }
+    .elim-row { color: #ff5566; }
+    .badge { padding: 3px 6px; font-size: 12px; border-radius: 3px; }
+    .badge-qual { background: #00ffcc22; color: #00ffcc; border: 1px solid #00ffcc; }
+    .badge-elim { background: #ff336622; color: #ff3366; border: 1px solid #ff3366; }
+  </style>
+</head>
+<body>
+
+  <h1>// PROJECT NEXUS: COMMAND MATRIX & LIVE ENGINE</h1>
+
+  <!-- GLOBAL CONFIG HEADER -->
+  <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+    <input type="text" id="apiBase" value="http://127.0.0.1:8000" placeholder="BACKEND API URL" style="max-width: 320px; margin: 0;">
+    <input type="password" id="adminKey" value="nexus_super_admin_2026" placeholder="ADMIN SECRET KEY" style="max-width: 250px; margin: 0;">
+    <button onclick="refreshLeaderboard()" style="width: auto; padding: 10px 20px;">SYNC DASHBOARD</button>
+  </div>
+
+  <div class="layout-grid">
+    <!-- LEFT COLUMN: QUESTION BANK EDITOR & CREDENTIAL DISPATCH -->
+    <div>
+      <!-- 1. LIVE QUESTION BANK & KEY EDITOR -->
+      <div class="card">
+        <h2>&gt; QUESTION & ANSWER-KEY MANAGER</h2>
+        <div style="display: flex; gap: 10px;">
+          <select id="editRoundSelect" onchange="loadQuestionsForEditing()">
+            <option value="1">Round 1 Question Bank</option>
+            <option value="2">Round 2 Question Bank</option>
+            <option value="3">Round 3 Question Bank</option>
+          </select>
+          <button onclick="addBlankQuestion()" style="width: 140px;">+ ADD NODE</button>
+        </div>
+
+        <div id="questionListContainer" style="max-height: 480px; overflow-y: auto; margin-top: 15px; padding-right: 5px;"></div>
+        
+        <button onclick="saveQuestionBank()" class="btn-warning" style="margin-top: 10px;">SAVE & SYNC QUESTIONS TO DB</button>
+        <div id="qSaveMsg" style="font-size: 13px; margin-top: 6px;"></div>
+      </div>
+
+      <!-- 2. TEAM REGISTRATION -->
+      <div class="card">
+        <h2>&gt; CREDENTIAL GENERATOR</h2>
+        <input type="text" id="teamNameInput" placeholder="ENTER TEAM NAME (E.G. ALGO KNIGHTS)">
+        <button onclick="generateTeamCredentials()">GENERATE TEAM ID & ACCESS KEY</button>
+        <div id="credDisplay" style="margin-top: 10px; font-size: 14px; color: #ffff00;"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: LEADERBOARDS & PROMOTION ENGINE -->
+    <div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2>&gt; ROUND <span id="viewingRoundNum">1</span> LIVE TOURNAMENT RANKINGS</h2>
+          <div style="width: 150px;">
+            <select id="boardRoundSelect" onchange="refreshLeaderboard()">
+              <option value="1">Round 1</option>
+              <option value="2">Round 2</option>
+              <option value="3">Round 3</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="liveTelemetry" style="margin: 10px 0; font-size: 14px; color: #aaa;"></div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Team ID</th>
+              <th>Team Name</th>
+              <th>Score</th>
+              <th>Time</th>
+              <th>Switches</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="boardBody">
+            <tr><td colspan="7">No submissions recorded.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PROMOTION AUTOMATOR -->
+      <div class="card">
+        <h2>&gt; TOURNAMENT PROMOTION AUTOMATOR</h2>
+        <p style="font-size: 13px; color: #888; margin-bottom: 12px;">Tie-Breaker Hierarchy: Score (Desc) &gt; Time Taken (Asc) &gt; Tab Switches (Asc)</p>
+        <div style="display: flex; gap: 15px;">
+          <div style="flex: 1;">
+            <label>Promote Top N Teams:</label>
+            <input type="number" id="promoteTopN" value="10" min="1">
+          </div>
+          <div style="flex: 1;">
+            <label>Target Round:</label>
+            <select id="promoteTargetRound">
+              <option value="2">Round 2</option>
+              <option value="3">Round 3</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="executePromotion()" class="btn-warning">EXECUTE PROMOTION & LOCK ROUND</button>
+        <div id="promoResult" style="margin-top: 8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentQuestions = [];
+
+    // --- QUESTION EDITOR LOGIC ---
+    async function loadQuestionsForEditing() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const round = document.getElementById('editRoundSelect').value;
+
+      try {
+        const res = await fetch(`${api}/api/admin/questions/${round}`, {
+          headers: { "x-admin-key": key }
+        });
+        const data = await res.json();
+        currentQuestions = data.questions || [];
+        renderQuestionEditor();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderQuestionEditor() {
+      const container = document.getElementById('questionListContainer');
+      container.innerHTML = "";
+
+      if (currentQuestions.length === 0) {
+        container.innerHTML = "<p style='color:#777;'>No questions loaded for this round. Click '+ ADD NODE' to begin.</p>";
+        return;
+      }
+
+      currentQuestions.forEach((q, idx) => {
+        const qCard = document.createElement('div');
+        qCard.className = 'q-item-card';
+        qCard.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong>NODE #${idx + 1} (${q.id})</strong>
+            <button onclick="removeQuestion(${idx})" class="btn-danger" style="width: auto; padding: 2px 8px; font-size: 12px;">DELETE</button>
+          </div>
+          <input type="text" value="${q.text}" onchange="currentQuestions[${idx}].text = this.value" placeholder="Question Text">
+          
+          <div style="display: flex; gap: 10px;">
+            <select onchange="changeQuestionType(${idx}, this.value)" style="flex: 1;">
+              <option value="text" ${q.type === 'text' ? 'selected' : ''}>Fill in the Blank</option>
+              <option value="mcq" ${q.type === 'mcq' ? 'selected' : ''}>Multiple Choice (MCQ)</option>
+            </select>
+            <input type="text" value="${q.correct_answer}" onchange="currentQuestions[${idx}].correct_answer = this.value" placeholder="Exact Correct Answer" style="flex: 1; border-color: #ffff00; color: #ffff00;">
+          </div>
+
+          ${q.type === 'mcq' ? `
+            <div style="margin-top: 6px;">
+              <textarea placeholder="Options JSON format. E.g: [{'k':'A','t':'Opt 1'}, {'k':'B','t':'Opt 2'}]" onchange="updateMcqOptions(${idx}, this.value)" style="height: 65px; font-size: 12px;">${JSON.stringify(q.options || [])}</textarea>
+            </div>
+          ` : ''}
+        `;
+        container.appendChild(qCard);
+      });
+    }
+
+    function addBlankQuestion() {
+      const newId = `Q${currentQuestions.length + 1}`;
+      currentQuestions.push({
+        id: newId,
+        type: "mcq",
+        text: "New Question Text",
+        options: [
+          { k: "A", t: "Option 1" },
+          { k: "B", t: "Option 2" },
+          { k: "C", t: "Option 3" },
+          { k: "D", t: "Option 4" }
+        ],
+        correct_answer: "A"
+      });
+      renderQuestionEditor();
+    }
+
+    function removeQuestion(index) {
+      currentQuestions.splice(index, 1);
+      // Re-index IDs
+      currentQuestions.forEach((q, i) => q.id = `Q${i + 1}`);
+      renderQuestionEditor();
+    }
+
+    function changeQuestionType(index, type) {
+      currentQuestions[index].type = type;
+      if (type === 'mcq' && (!currentQuestions[index].options || currentQuestions[index].options.length === 0)) {
+        currentQuestions[index].options = [
+          { k: "A", t: "Option 1" },
+          { k: "B", t: "Option 2" },
+          { k: "C", t: "Option 3" },
+          { k: "D", t: "Option 4" }
+        ];
+      }
+      renderQuestionEditor();
+    }
+
+    function updateMcqOptions(index, jsonStr) {
+      try {
+        currentQuestions[index].options = JSON.parse(jsonStr);
+      } catch(e) {
+        alert("Invalid Options JSON format!");
+      }
+    }
+
+    async function saveQuestionBank() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const round = parseInt(document.getElementById('editRoundSelect').value);
+      const msg = document.getElementById('qSaveMsg');
+
+      const res = await fetch(`${api}/api/admin/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": key },
+        body: JSON.stringify({ round_number: round, questions: currentQuestions })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        msg.innerHTML = `<span style="color:#00ffcc">&gt; SUCCESSFULLY SYNCED ${data.question_count} NODES TO DATABASE FOR ROUND ${round}.</span>`;
+      } else {
+        msg.innerHTML = `<span style="color:#ff3366">&gt; ERROR: ${data.detail}</span>`;
+      }
+    }
+
+    // --- CREDENTIAL GENERATION ---
+    async function generateTeamCredentials() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const name = document.getElementById('teamNameInput').value.trim();
+      if (!name) return alert("Enter a team name!");
+
+      const res = await fetch(`${api}/api/admin/create-team`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": key },
+        body: JSON.stringify({ team_name: name })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('credDisplay').innerHTML = `
+          [+] TEAM REGISTERED:<br>
+          <strong>NAME:</strong> ${data.team_name}<br>
+          <strong>TEAM ID:</strong> <span style="color:#00ffcc">${data.team_id}</span><br>
+          <strong>PASSWORD:</strong> <span style="color:#00ffcc">${data.password}</span>
+        `;
+        document.getElementById('teamNameInput').value = "";
+        refreshLeaderboard();
+      }
+    }
+
+    // --- LEADERBOARD & PROMOTION ---
+    async function refreshLeaderboard() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const round = document.getElementById('boardRoundSelect').value;
+      document.getElementById('viewingRoundNum').innerText = round;
+
+      const res = await fetch(`${api}/api/admin/leaderboard/${round}`, {
+        headers: { "x-admin-key": key }
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+
+      document.getElementById('liveTelemetry').innerHTML = `
+        Registered: <strong>${data.total_registered}</strong> | Received: <strong>${data.total_submitted}</strong> | 
+        Status: ${data.all_teams_submitted ? '<span style="color:#00ffcc">[ALL NODES SYNCED]</span>' : '<span style="color:#ffaa00">[ROUND RUNNING]</span>'}
+      `;
+
+      const tbody = document.getElementById('boardBody');
+      if (data.leaderboard.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7">No logs received for Round ${round}.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.leaderboard.map(r => `
+        <tr class="${r.status === 'ELIMINATED' ? 'elim-row' : ''}">
+          <td class="${r.rank === 1 ? 'rank-1' : ''}">#${r.rank}</td>
+          <td>${r.team_id}</td>
+          <td>${r.team_name}</td>
+          <td><strong>${r.score} pts</strong></td>
+          <td>${r.time_taken_seconds}s</td>
+          <td>${r.tab_switch_count}</td>
+          <td><span class="badge ${r.status === 'QUALIFIED' ? 'badge-qual' : 'badge-elim'}">${r.status}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    async function executePromotion() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const topN = parseInt(document.getElementById('promoteTopN').value);
+      const nextR = parseInt(document.getElementById('promoteTargetRound').value);
+
+      if (!confirm(`Confirm promotion of Top ${topN} teams to Round ${nextR}? Remaining teams will be marked ELIMINATED.`)) return;
+
+      const res = await fetch(`${api}/api/admin/promote-teams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": key },
+        body: JSON.stringify({ top_n_teams: topN, next_round: nextR })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('promoResult').innerHTML = `<span style="color:#00ffcc">&gt; PROMOTED: ${data.promoted_count} | ELIMINATED: ${data.eliminated_count}</span>`;
+        refreshLeaderboard();
+      }
+    }
+
+    // Auto-refresh & init
+    loadQuestionsForEditing();
+    refreshLeaderboard();
+    setInterval(refreshLeaderboard, 4000);
+  </script>
+</body>
+</html>
