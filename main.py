@@ -67,6 +67,9 @@ class SaveRoundQuestionsRequest(BaseModel):
 class CreateTeamRequest(BaseModel):
     team_name: str
 
+class CreateTeamsBulkRequest(BaseModel):
+    team_names: List[str]
+
 class LoginRequest(BaseModel):
     team_id: str
     password: str
@@ -167,6 +170,64 @@ async def admin_create_team(payload: CreateTeamRequest, x_admin_key: str = Heade
 
     await teams_col.insert_one(new_team)
     return {"status": "success", "team_id": team_id, "team_name": t_name, "password": password}
+
+@app.post("/api/admin/create-teams-bulk")
+async def admin_create_teams_bulk(payload: CreateTeamsBulkRequest, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+
+    names = [n.strip() for n in payload.team_names if n.strip()]
+    if not names:
+        raise HTTPException(status_code=400, detail="No valid team names provided.")
+
+    # Avoid team_id collisions within this batch (extremely unlikely but cheap to guard)
+    existing_ids = set()
+    cursor = teams_col.find({}, {"team_id": 1})
+    async for doc in cursor:
+        existing_ids.add(doc["team_id"])
+
+    created = []
+    new_docs = []
+    for t_name in names:
+        team_id = f"NEX-{''.join(secrets.choice(string.digits) for _ in range(4))}"
+        while team_id in existing_ids:
+            team_id = f"NEX-{''.join(secrets.choice(string.digits) for _ in range(4))}"
+        existing_ids.add(team_id)
+
+        password = generate_random_password(6)
+        new_docs.append({
+            "team_id": team_id,
+            "team_name": t_name,
+            "password": password,
+            "current_round": 1,
+            "status": "QUALIFIED",
+            "created_at": datetime.now(timezone.utc)
+        })
+        created.append({"team_id": team_id, "team_name": t_name, "password": password})
+
+    if new_docs:
+        await teams_col.insert_many(new_docs)
+
+    return {"status": "success", "created_count": len(created), "teams": created}
+
+@app.get("/api/admin/teams")
+async def admin_list_teams(x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+
+    cursor = teams_col.find({}).sort("created_at", 1)
+    teams = await cursor.to_list(length=1000)
+
+    result = []
+    for t in teams:
+        result.append({
+            "team_id": t["team_id"],
+            "team_name": t.get("team_name", ""),
+            "password": t.get("password", ""),
+            "current_round": t.get("current_round", 1),
+            "status": t.get("status", "QUALIFIED")
+        })
+    return {"status": "success", "total": len(result), "teams": result}
 
 @app.get("/api/admin/leaderboard/{round_number}")
 async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(None)):
