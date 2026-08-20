@@ -6,12 +6,12 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 
 app = FastAPI(title="Project Nexus Tournament Engine")
 
-# CORS middleware for open accessibility across deployments
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,7 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. MongoDB Connection Setup with URL-encoding
+# 1. MongoDB Connection Setup
 username = "codesmudit_db_user"
 raw_password = "YOUR_RAW_PASSWORD_HERE"  # Insert your raw password here
 encoded_password = urllib.parse.quote_plus(raw_password)
@@ -38,12 +38,27 @@ questions_col = db["round_questions"]
 
 ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "nexus_super_admin_2026")
 
+# --- STATIC FRONTEND FILE SERVING ---
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return HTMLResponse("<h1>Index file not found on server</h1>", status_code=404)
+
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin.html", response_class=HTMLResponse)
+async def serve_admin():
+    if os.path.exists("admin.html"):
+        return FileResponse("admin.html")
+    return HTMLResponse("<h1>Admin file not found on server</h1>", status_code=404)
+
 # --- Schemas ---
 class QuestionModel(BaseModel):
     id: str
-    type: str  # 'mcq' or 'text'
+    type: str
     text: str
-    options: Optional[List[Dict[str, str]]] = None  # [{"k": "A", "t": "Option text"}]
+    options: Optional[List[Dict[str, str]]] = None
     correct_answer: str
 
 class SaveRoundQuestionsRequest(BaseModel):
@@ -107,7 +122,6 @@ async def admin_get_questions(round_number: int, x_admin_key: str = Header(None)
     if not doc:
         return {"round_number": round_number, "questions": []}
     
-    # Exclude MongoDB internal ID
     doc.pop("_id", None)
     return doc
 
@@ -119,7 +133,6 @@ async def get_questions_for_round(round_number: int):
     if not doc:
         return {"questions": []}
     
-    # Strip correct answers before sending to participant frontend
     safe_questions = []
     for q in doc.get("questions", []):
         safe_questions.append({
@@ -161,7 +174,6 @@ async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(Non
     if x_admin_key != ADMIN_SECRET_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
 
-    # Tie-Breaking Engine: Score DESC -> Time Taken ASC -> Tab Switches ASC
     cursor = submissions_col.find({"round_number": round_number}).sort([
         ("score", -1),
         ("time_taken_seconds", 1),
@@ -295,7 +307,6 @@ async def submit_quiz(payload: SubmitQuizRequest):
     if not team:
         raise HTTPException(status_code=401, detail="Authentication failed.")
 
-    # Fetch official questions and answer key from DB for this round
     doc = await questions_col.find_one({"round_number": payload.round_number})
     if not doc:
         raise HTTPException(status_code=400, detail="Round question bank not found.")
