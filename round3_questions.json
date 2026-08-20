@@ -1,0 +1,41 @@
+{
+  "round_number": 3,
+  "questions": [
+    {
+      "id": "Q1",
+      "type": "mcq",
+      "text": "Based on the evidence (false alibi, RFID logs, and CCTV footage), who breached the Archive Vault?",
+      "options": [
+        { "k": "A", "t": "Dr. V. Arya" },
+        { "k": "B", "t": "A. Sen" },
+        { "k": "C", "t": "R. Sharma" },
+        { "k": "D", "t": "M. Khan" }
+      ],
+      "correct_answer": "B"
+    },
+    {
+      "id": "Q2",
+      "type": "text",
+      "text": "At what exact time did the Archive Vault breach occur? (Format: HH:MM AM)",
+      "correct_answer": "03:55 AM"
+    },
+    {
+      "id": "Q3",
+      "type": "mcq",
+      "text": "How did the culprit gain entry to the Archive Vault?",
+      "options": [
+        { "k": "A", "t": "Cloned keycard using a Proxmark RFID Replicator" },
+        { "k": "B", "t": "Forced the door open" },
+        { "k": "C", "t": "Tailgated behind another employee" },
+        { "k": "D", "t": "Used a master key stolen from security" }
+      ],
+      "correct_answer": "A"
+    },
+    {
+      "id": "Q4",
+      "type": "text",
+      "text": "Which internal console bay was compromised during the data extraction?",
+      "correct_answer": "BAY-09"
+    }
+  ]
+}

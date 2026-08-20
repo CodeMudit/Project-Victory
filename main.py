@@ -73,7 +73,6 @@ class CreateTeamsBulkRequest(BaseModel):
 class LoginRequest(BaseModel):
     team_id: str
     password: str
-    target_round: int = 1
 
 class SubmitQuizRequest(BaseModel):
     team_id: str
@@ -315,7 +314,7 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
 async def participant_login(payload: LoginRequest):
     team = await teams_col.find_one({
         "team_id": payload.team_id.strip().upper(),
-        "password": payload.password.strip()
+        "password": payload.password.strip().upper()
     })
     
     if not team:
@@ -324,21 +323,24 @@ async def participant_login(payload: LoginRequest):
     if team.get("status") == "ELIMINATED":
         raise HTTPException(status_code=403, detail="Notice: Your team has been eliminated.")
 
-    if team.get("current_round", 1) < payload.target_round:
-        raise HTTPException(status_code=403, detail=f"Your team has not advanced to Round {payload.target_round}.")
+    # Always authenticate for the round the team is actually qualified for right now,
+    # per their own DB record — never trust a round number the client sends. This is
+    # what prevents a team that already cleared Round 1 from getting stuck trying to
+    # re-enter Round 1 (which would incorrectly look like "already submitted").
+    current_round = team.get("current_round", 1)
 
     existing_sub = await submissions_col.find_one({
         "team_id": team["team_id"],
-        "round_number": payload.target_round
+        "round_number": current_round
     })
     if existing_sub:
-        raise HTTPException(status_code=400, detail=f"Already submitted Round {payload.target_round}.")
+        raise HTTPException(status_code=400, detail=f"Already submitted Round {current_round}. Please wait for the next round to be unlocked by the admin.")
 
     return {
         "status": "success",
         "team_id": team["team_id"],
         "team_name": team["team_name"],
-        "current_round": team.get("current_round", 1)
+        "current_round": current_round
     }
 
 @app.get("/api/team/status/{team_id}")
@@ -362,7 +364,7 @@ async def check_team_status(team_id: str):
 async def submit_quiz(payload: SubmitQuizRequest):
     team = await teams_col.find_one({
         "team_id": payload.team_id.strip().upper(),
-        "password": payload.password.strip()
+        "password": payload.password.strip().upper()
     })
     if not team:
         raise HTTPException(status_code=401, detail="Authentication failed.")

@@ -1,0 +1,17 @@
+{
+  "round_number": 2,
+  "questions": [
+    {
+      "id": "Q1",
+      "type": "text",
+      "text": "Decode the T9 mobile keypad cipher [ 7777 - 33 - 777 - 888 - 33 - 777 ]. What is the decoded keyword?",
+      "correct_answer": "SERVER"
+    },
+    {
+      "id": "Q2",
+      "type": "text",
+      "text": "Using the Infrastructure Node Directory, look up the decoded keyword under Cluster Alias. What is its Physical Deployment Zone?",
+      "correct_answer": "ARCHIVE VAULT"
+    }
+  ]
+}

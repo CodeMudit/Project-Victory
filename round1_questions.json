@@ -1,0 +1,131 @@
+{
+  "round_number": 1,
+  "questions": [
+    {
+      "id": "Q1",
+      "type": "text",
+      "text": "LLM stands for ________________________________________.",
+      "correct_answer": "Large Language Model"
+    },
+    {
+      "id": "Q2",
+      "type": "text",
+      "text": "GPT stands for ________________________________________.",
+      "correct_answer": "Generative Pre-trained Transformer"
+    },
+    {
+      "id": "Q3",
+      "type": "text",
+      "text": "The term \"Artificial Intelligence\" was coined by ________________________________________ in 1956.",
+      "correct_answer": "John McCarthy"
+    },
+    {
+      "id": "Q4",
+      "type": "text",
+      "text": "Machine Learning in which the model is trained using labelled data is called ____________________ learning.",
+      "correct_answer": "Supervised"
+    },
+    {
+      "id": "Q5",
+      "type": "text",
+      "text": "ChatGPT was developed by ________________________________________.",
+      "correct_answer": "OpenAI"
+    },
+    {
+      "id": "Q6",
+      "type": "mcq",
+      "text": "Which of the following is an example of generative AI?",
+      "options": [
+        { "k": "A", "t": "A calculator performing arithmetic" },
+        { "k": "B", "t": "A system generating an image from a text prompt" },
+        { "k": "C", "t": "A thermometer measuring temperature" },
+        { "k": "D", "t": "A hard disk storing files" }
+      ],
+      "correct_answer": "B"
+    },
+    {
+      "id": "Q7",
+      "type": "mcq",
+      "text": "What will be the output? x = 17; y = 5; print(x % y)",
+      "options": [
+        { "k": "A", "t": "2" },
+        { "k": "B", "t": "3" },
+        { "k": "C", "t": "3.4" },
+        { "k": "D", "t": "4" }
+      ],
+      "correct_answer": "B"
+    },
+    {
+      "id": "Q8",
+      "type": "mcq",
+      "text": "Two resistors of 6 \u03a9 each are connected in parallel. Their equivalent resistance is:",
+      "options": [
+        { "k": "A", "t": "2 \u03a9" },
+        { "k": "B", "t": "3 \u03a9" },
+        { "k": "C", "t": "6 \u03a9" },
+        { "k": "D", "t": "12 \u03a9" }
+      ],
+      "correct_answer": "B"
+    },
+    {
+      "id": "Q9",
+      "type": "mcq",
+      "text": "In a certain code, every letter is replaced by the next letter of the alphabet. If MANGO \u2192 NBOPH, then APPLE \u2192 ?",
+      "options": [
+        { "k": "A", "t": "BPPMF" },
+        { "k": "B", "t": "BQQMF" },
+        { "k": "C", "t": "BQQLE" },
+        { "k": "D", "t": "CQQMF" }
+      ],
+      "correct_answer": "B"
+    },
+    {
+      "id": "Q10",
+      "type": "mcq",
+      "text": "A processor operates at 3 GHz. Approximately how many clock cycles occur in 1 microsecond?",
+      "options": [
+        { "k": "A", "t": "300" },
+        { "k": "B", "t": "3,000" },
+        { "k": "C", "t": "30,000" },
+        { "k": "D", "t": "3,000,000" }
+      ],
+      "correct_answer": "B"
+    },
+    {
+      "id": "Q11",
+      "type": "mcq",
+      "text": "You have 8 identical-looking balls, but one ball is heavier. Using a balance scale, what is the minimum number of weighings required to guarantee finding the heavier ball?",
+      "options": [
+        { "k": "A", "t": "1" },
+        { "k": "B", "t": "2" },
+        { "k": "C", "t": "3" },
+        { "k": "D", "t": "4" }
+      ],
+      "correct_answer": "B"
+    },
+    {
+      "id": "Q12",
+      "type": "text",
+      "text": "CNN stands for ________________________________________ in deep learning.",
+      "correct_answer": "Convolutional Neural Network"
+    },
+    {
+      "id": "Q13",
+      "type": "text",
+      "text": "The standard test proposed in 1950 to evaluate machine intelligence is the ____________________ Test.",
+      "correct_answer": "Turing"
+    },
+    {
+      "id": "Q14",
+      "type": "text",
+      "text": "Gemini was developed by ________________________.",
+      "correct_answer": "Google"
+    },
+    {
+      "id": "Q15",
+      "type": "text",
+      "text": "NLP stands for ________________________________________.",
+      "correct_answer": "Natural Language Processing"
+    }
+  ]
+}

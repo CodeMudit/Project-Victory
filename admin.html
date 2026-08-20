@@ -119,6 +119,7 @@
           <h2>&gt; ALL TEAM CREDENTIALS</h2>
           <button onclick="loadAllTeams()" style="width: auto; padding: 6px 14px;">REFRESH</button>
         </div>
+        <input type="text" id="teamSearchInput" placeholder="SEARCH BY TEAM ID OR NAME (E.G. NEX-4920)" style="text-transform: uppercase;" oninput="filterTeamsTable()">
         <table>
           <thead>
             <tr>
@@ -380,6 +381,37 @@
     }
 
     // --- PERSISTENT ALL-TEAMS CREDENTIAL TABLE ---
+    let allTeamsCache = [];
+
+    function renderTeamsTable(teams) {
+      const tbody = document.getElementById('allTeamsBody');
+      if (teams.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5">No matching teams.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = teams.map(t => `
+        <tr class="${t.status === 'ELIMINATED' ? 'elim-row' : ''}">
+          <td>${t.team_id}</td>
+          <td>${t.team_name}</td>
+          <td style="color:#ffff00">${t.password}</td>
+          <td>${t.current_round}</td>
+          <td><span class="badge ${t.status === 'QUALIFIED' ? 'badge-qual' : 'badge-elim'}">${t.status}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    function filterTeamsTable() {
+      const query = document.getElementById('teamSearchInput').value.trim().toUpperCase();
+      if (!query) {
+        renderTeamsTable(allTeamsCache);
+        return;
+      }
+      const filtered = allTeamsCache.filter(t =>
+        t.team_id.toUpperCase().includes(query) || t.team_name.toUpperCase().includes(query)
+      );
+      renderTeamsTable(filtered);
+    }
+
     async function loadAllTeams() {
       const api = document.getElementById('apiBase').value;
       const key = document.getElementById('adminKey').value;
@@ -395,20 +427,8 @@
           return;
         }
 
-        if (data.teams.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="5">No teams created yet.</td></tr>`;
-          return;
-        }
-
-        tbody.innerHTML = data.teams.map(t => `
-          <tr class="${t.status === 'ELIMINATED' ? 'elim-row' : ''}">
-            <td>${t.team_id}</td>
-            <td>${t.team_name}</td>
-            <td style="color:#ffff00">${t.password}</td>
-            <td>${t.current_round}</td>
-            <td><span class="badge ${t.status === 'QUALIFIED' ? 'badge-qual' : 'badge-elim'}">${t.status}</span></td>
-          </tr>
-        `).join('');
+        allTeamsCache = data.teams;
+        filterTeamsTable();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="5" style="color:#ff3366">REQUEST FAILED: ${err}</td></tr>`;
       }

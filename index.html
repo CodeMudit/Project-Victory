@@ -172,7 +172,6 @@
   <div class="terminal-card" id="loginScreen">
     <div class="header-bar">
       <div>PROJECT NEXUS // SYSTEM GATEWAY</div>
-      <div>ROUND <span id="loginRoundNum">1</span></div>
     </div>
     <p>&gt; ENTER AUTHORIZED CREDENTIALS DISPATCHED BY FACILITATORS.</p>
     <input type="text" id="loginTeamId" placeholder="TEAM ID (E.G. NEX-4920)" autocomplete="off">
@@ -242,7 +241,7 @@
     // Login Handler
     document.getElementById('loginBtn').addEventListener('click', async () => {
       const idInput = document.getElementById('loginTeamId').value.trim().toUpperCase();
-      const passInput = document.getElementById('loginPass').value.trim();
+      const passInput = document.getElementById('loginPass').value.trim().toUpperCase();
       const msg = document.getElementById('loginMsg');
 
       if (!idInput || !passInput) {
@@ -254,7 +253,7 @@
         const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ team_id: idInput, password: passInput, target_round: activeRound })
+          body: JSON.stringify({ team_id: idInput, password: passInput })
         });
         const data = await res.json();
         if (!res.ok) {

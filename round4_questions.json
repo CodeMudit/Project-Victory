@@ -1,0 +1,23 @@
+{
+  "round_number": 4,
+  "questions": [
+    {
+      "id": "Q1",
+      "type": "text",
+      "text": "GATE 1 — ENTER TARGET CLUSTER ALIAS:",
+      "correct_answer": "SERVER"
+    },
+    {
+      "id": "Q2",
+      "type": "text",
+      "text": "GATE 2 — ENTER COMPROMISED TERMINAL ID:",
+      "correct_answer": "BAY-09"
+    },
+    {
+      "id": "Q3",
+      "type": "text",
+      "text": "GATE 3 — ENTER TRAITOR'S SURNAME:",
+      "correct_answer": "SEN"
+    }
+  ]
+}
