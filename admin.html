@@ -73,7 +73,7 @@
   <!-- GLOBAL CONFIG HEADER -->
   <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
     <input type="text" id="apiBase" value="https://project-victory-production-d780.up.railway.app" placeholder="BACKEND API URL" style="max-width: 320px; margin: 0;">
-    <input type="password" id="adminKey" value="nexus_super_admin_2026" placeholder="ADMIN SECRET KEY" style="max-width: 250px; margin: 0;">
+    <input type="password" id="adminKey" value="" placeholder="ADMIN SECRET KEY" style="max-width: 250px; margin: 0;" oninput="localStorage.setItem('nexusAdminKey', this.value)">
     <button onclick="refreshLeaderboard()" style="width: auto; padding: 10px 20px;">SYNC DASHBOARD</button>
   </div>
 
@@ -367,6 +367,10 @@
         refreshLeaderboard();
       }
     }
+
+    // Load previously entered admin key from this browser only (never shipped in HTML)
+    const savedKey = localStorage.getItem('nexusAdminKey');
+    if (savedKey) document.getElementById('adminKey').value = savedKey;
 
     // Auto-refresh & init
     loadQuestionsForEditing();

@@ -1,7 +1,6 @@
 import os
 import secrets
 import string
-import urllib.parse
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Header
@@ -21,22 +20,22 @@ app.add_middleware(
 )
 
 # 1. MongoDB Connection Setup
-username = "codesmudit_db_user"
-raw_password = "YOUR_RAW_PASSWORD_HERE"  # Insert your raw password here
-encoded_password = urllib.parse.quote_plus(raw_password)
+# MONGO_URI and ADMIN_SECRET_KEY must be set as real environment variables on Railway.
+# No hardcoded fallbacks: if they're missing, fail loudly instead of running with a
+# known/default secret.
+MONGO_URI = os.getenv("MONGO_URI")
+if not MONGO_URI:
+    raise RuntimeError("MONGO_URI environment variable is not set.")
 
-MONGO_URI = os.getenv(
-    "MONGO_URI",
-    f"mongodb+srv://{username}:{encoded_password}@farmer.wjbh2xe.mongodb.net/?retryWrites=true&w=majority&appName=farmer"
-)
+ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
+if not ADMIN_SECRET_KEY:
+    raise RuntimeError("ADMIN_SECRET_KEY environment variable is not set.")
 
 client = AsyncIOMotorClient(MONGO_URI)
 db = client["nexus_event_db"]
 teams_col = db["teams"]
 submissions_col = db["submissions"]
 questions_col = db["round_questions"]
-
-ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "nexus_super_admin_2026")
 
 # --- STATIC FRONTEND FILE SERVING ---
 
