@@ -13,7 +13,7 @@ import os
 import sys
 import requests
 
-API_BASE = os.getenv("NEXUS_API_BASE", "https://project-victory-production-d780.up.railway.app")
+API_BASE = os.getenv("NEXUS_API_BASE", "https://project-victory-production-5eda.up.railway.app")
 ADMIN_KEY = os.getenv("NEXUS_ADMIN_KEY", "nexus_activate")
 
 ROUND_FILES = [
