@@ -47,7 +47,7 @@
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
     button {
       background: var(--accent);
-      color: #041018;
+      color: #041008;
       font-weight: bold;
       cursor: pointer;
       border: none;
@@ -95,10 +95,10 @@
     <button onclick="refreshLeaderboard()" style="width: auto; padding: 10px 20px;">SYNC DASHBOARD</button>
   </div>
 
-  <!-- ROUND GATE CONTROL -->
+  <!-- ROUND GATE CONTROL & OVERRIDES -->
   <div class="card">
-    <h2>&gt; ROUND GATE CONTROL</h2>
-    <p class="muted" style="margin-bottom: 12px;">Teams cannot log in to a round until it is OPENED here. The scoring clock for every team starts the moment you open it.</p>
+    <h2>&gt; ROUND GATE CONTROL & EMERGENCY ENGINE</h2>
+    <p class="muted" style="margin-bottom: 12px;">Teams cannot log in to a round until it is OPENED here.</p>
     <div class="gate-row">
       <select id="gateRoundSelect" onchange="refreshGateStatus()" style="max-width: 160px;">
         <option value="1">Round 1</option><option value="2">Round 2</option>
@@ -109,6 +109,8 @@
       <div style="flex: 1;"></div>
       <button onclick="openRound()" style="width: auto; padding: 10px 18px;">OPEN ROUND</button>
       <button onclick="closeRound()" class="btn-danger" style="width: auto; padding: 10px 18px;">CLOSE ROUND</button>
+      <button onclick="forceSubmitCurrentRound()" class="btn-warning" style="width: auto; padding: 10px 18px;">⚡ FORCE SUBMIT ALL</button>
+      <button onclick="undoRound()" class="btn-danger" style="width: auto; padding: 10px 18px;">↺ RESET ROUND</button>
     </div>
     <div id="gateMsg" style="font-size: 12px; margin-top: 6px;"></div>
   </div>
@@ -135,10 +137,16 @@
       <!-- HINT LADDER EDITOR -->
       <div class="card">
         <h2>&gt; HINT LADDER MANAGER</h2>
-        <p class="muted" style="margin-bottom: 10px;">Round-level hints (apply to the whole round, matching the printed hint rubric). Tier 1 is conventionally free; deeper tiers cost points.</p>
+        <p class="muted" style="margin-bottom: 10px;">Configure hints. Hints deduct points upon access.</p>
         <div id="hintListContainer" style="max-height: 260px; overflow-y: auto;"></div>
         <button onclick="addBlankHint()" style="width: auto; padding: 8px 16px;">+ ADD HINT TIER</button>
-        <div id="hintSaveNote" class="muted" style="margin-top: 8px;">Hints save together with the question bank above — click SAVE & SYNC TO DB when done.</div>
+        <div id="hintSaveNote" class="muted" style="margin-top: 8px;">Hints save together with the question bank above.</div>
+      </div>
+
+      <!-- CASE FILES / EVIDENCE DOSSIER EDITOR -->
+      <div class="card">
+        <h2>&gt; CASE FILES / EVIDENCE DOSSIER (HTML)</h2>
+        <textarea id="briefingEditor" style="height: 220px; font-size: 12px;" placeholder="<div class='evidence-doc'>...</div>"></textarea>
       </div>
 
       <!-- TEAM REGISTRATION -->
@@ -161,8 +169,8 @@
         </div>
         <input type="text" id="teamSearchInput" placeholder="SEARCH BY TEAM ID OR NAME" style="text-transform: uppercase;" oninput="filterTeamsTable()">
         <table>
-          <thead><tr><th>Team ID</th><th>Team Name</th><th>Access Key</th><th>Round</th><th>Status</th></tr></thead>
-          <tbody id="allTeamsBody"><tr><td colspan="5">Loading...</td></tr></tbody>
+          <thead><tr><th>Team ID</th><th>Team Name</th><th>Access Key</th><th>Round</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="allTeamsBody"><tr><td colspan="6">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -187,7 +195,7 @@
 
       <div class="card">
         <h2>&gt; TOURNAMENT PROMOTION AUTOMATOR</h2>
-        <p class="muted" style="margin-bottom: 12px;">Tie-Breaker Hierarchy: Score (Desc) &gt; Time Taken (Asc) &gt; Tab Switches (Asc). Time Taken is measured server-side from when you opened the round.</p>
+        <p class="muted" style="margin-bottom: 12px;">Promote top teams to next round. Unpromoted teams will be marked ELIMINATED.</p>
         <div style="display: flex; gap: 15px;">
           <div style="flex: 1;"><label>Promote Top N Teams:</label><input type="number" id="promoteTopN" value="10" min="1"></div>
           <div style="flex: 1;"><label>Target Round:</label>
@@ -195,7 +203,6 @@
           </div>
         </div>
         <button onclick="executePromotion()" class="btn-warning">EXECUTE PROMOTION & LOCK ROUND</button>
-        <p class="muted" style="margin-top: 6px;">The target round is left CLOSED after promotion — open it from Round Gate Control above when ready.</p>
         <div id="promoResult" style="margin-top: 8px;"></div>
       </div>
     </div>
@@ -204,8 +211,8 @@
   <script>
     let currentQuestions = [];
     let currentHints = [];
+    let currentBriefing = "";
 
-    // --- ROUND GATE CONTROL ---
     async function refreshGateStatus() {
       const api = document.getElementById('apiBase').value;
       const round = document.getElementById('gateRoundSelect').value;
@@ -229,7 +236,7 @@
       const key = document.getElementById('adminKey').value;
       const round = document.getElementById('gateRoundSelect').value;
       const msg = document.getElementById('gateMsg');
-      if (!confirm(`Open Round ${round}? The scoring clock starts for ALL teams the moment you confirm.`)) return;
+      if (!confirm(`Open Round ${round}?`)) return;
       try {
         const res = await fetch(`${api}/api/admin/round/${round}/open`, { method: "POST", headers: { "x-admin-key": key } });
         const data = await res.json();
@@ -243,7 +250,7 @@
       const key = document.getElementById('adminKey').value;
       const round = document.getElementById('gateRoundSelect').value;
       const msg = document.getElementById('gateMsg');
-      if (!confirm(`Close Round ${round}? Teams who haven't logged in yet will be held at the waiting screen.`)) return;
+      if (!confirm(`Close Round ${round}?`)) return;
       try {
         const res = await fetch(`${api}/api/admin/round/${round}/close`, { method: "POST", headers: { "x-admin-key": key } });
         const data = await res.json();
@@ -252,7 +259,34 @@
       } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
     }
 
-    // --- QUESTION + HINT EDITOR ---
+    async function forceSubmitCurrentRound() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const round = document.getElementById('gateRoundSelect').value;
+      const msg = document.getElementById('gateMsg');
+      if (!confirm(`Force-submit all unsubmitted teams for Round ${round}?`)) return;
+      try {
+        const res = await fetch(`${api}/api/admin/round/${round}/force-submit`, { method: "POST", headers: { "x-admin-key": key } });
+        const data = await res.json();
+        if (res.ok) { msg.innerHTML = `<span style="color:var(--accent)">&gt; FORCE SUBMITTED ${data.force_submitted_count} SESSIONS.</span>`; refreshLeaderboard(); }
+        else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
+      } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
+    }
+
+    async function undoRound() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const round = document.getElementById('gateRoundSelect').value;
+      const msg = document.getElementById('gateMsg');
+      if (!confirm(`RESET ROUND ${round}? All logs and submissions for Round ${round} will be erased.`)) return;
+      try {
+        const res = await fetch(`${api}/api/admin/round/${round}/undo-round`, { method: "POST", headers: { "x-admin-key": key } });
+        const data = await res.json();
+        if (res.ok) { msg.innerHTML = `<span style="color:var(--gold)">&gt; ROUND ${round} RESET COMPLETED.</span>`; refreshLeaderboard(); loadAllTeams(); refreshGateStatus(); }
+        else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
+      } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
+    }
+
     async function loadQuestionsForEditing() {
       const api = document.getElementById('apiBase').value;
       const key = document.getElementById('adminKey').value;
@@ -262,6 +296,8 @@
         const data = await res.json();
         currentQuestions = data.questions || [];
         currentHints = data.hints || [];
+        currentBriefing = data.briefing || "";
+        document.getElementById('briefingEditor').value = currentBriefing;
         renderQuestionEditor();
         renderHintEditor();
       } catch (err) { console.error(err); }
@@ -271,7 +307,7 @@
       const container = document.getElementById('questionListContainer');
       container.innerHTML = "";
       if (currentQuestions.length === 0) {
-        container.innerHTML = "<p class='muted'>No questions loaded for this round. Click '+ ADD NODE' to begin.</p>";
+        container.innerHTML = "<p class='muted'>No questions loaded for this round.</p>";
         return;
       }
       currentQuestions.forEach((q, idx) => {
@@ -293,7 +329,7 @@
           </div>
           ${q.type === 'mcq' ? `
             <div style="margin-top: 6px;">
-              <textarea placeholder="Options JSON. E.g: [{'k':'A','t':'Opt 1'}]" onchange="updateMcqOptions(${idx}, this.value)" style="height: 60px; font-size: 12px;">${JSON.stringify(q.options || [])}</textarea>
+              <textarea placeholder="Options JSON" onchange="updateMcqOptions(${idx}, this.value)" style="height: 60px; font-size: 12px;">${JSON.stringify(q.options || [])}</textarea>
             </div>` : ''}
         `;
         container.appendChild(qCard);
@@ -333,7 +369,7 @@
       const container = document.getElementById('hintListContainer');
       container.innerHTML = "";
       if (currentHints.length === 0) {
-        container.innerHTML = "<p class='muted'>No hints configured for this round yet.</p>";
+        container.innerHTML = "<p class='muted'>No hints configured.</p>";
         return;
       }
       currentHints.sort((a,b) => a.tier - b.tier).forEach((h, idx) => {
@@ -371,10 +407,11 @@
       const round = parseInt(document.getElementById('editRoundSelect').value);
       const msg = document.getElementById('qSaveMsg');
 
+      currentBriefing = document.getElementById('briefingEditor').value;
       const res = await fetch(`${api}/api/admin/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-admin-key": key },
-        body: JSON.stringify({ round_number: round, questions: currentQuestions, hints: currentHints })
+        body: JSON.stringify({ round_number: round, questions: currentQuestions, hints: currentHints, briefing: currentBriefing })
       });
       const data = await res.json();
       if (res.ok) {
@@ -384,7 +421,6 @@
       }
     }
 
-    // --- CREDENTIAL GENERATION ---
     function renderTeamNameInputs() {
       const count = parseInt(document.getElementById('teamCountInput').value) || 0;
       const container = document.getElementById('teamNameInputsContainer');
@@ -419,10 +455,9 @@
         });
         const data = await res.json();
         if (res.ok) {
-          msg.innerHTML = `<span style="color:var(--accent)">&gt; CREATED ${data.created_count} TEAM(S). SEE TABLE BELOW.</span>`;
+          msg.innerHTML = `<span style="color:var(--accent)">&gt; CREATED ${data.created_count} TEAM(S).</span>`;
           document.getElementById('teamNameInputsContainer').innerHTML = "";
           document.getElementById('generateAllBtn').style.display = "none";
-          document.getElementById('teamCountInput').value = "10";
           loadAllTeams(); refreshLeaderboard();
         } else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
       } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
@@ -432,12 +467,16 @@
 
     function renderTeamsTable(teams) {
       const tbody = document.getElementById('allTeamsBody');
-      if (teams.length === 0) { tbody.innerHTML = `<tr><td colspan="5">No matching teams.</td></tr>`; return; }
+      if (teams.length === 0) { tbody.innerHTML = `<tr><td colspan="6">No matching teams.</td></tr>`; return; }
       tbody.innerHTML = teams.map(t => `
         <tr class="${t.status === 'ELIMINATED' ? 'elim-row' : ''}">
           <td>${t.team_id}</td><td>${t.team_name}</td><td style="color:var(--gold)">${t.password}</td>
           <td>${t.current_round}</td>
           <td><span class="badge ${t.status === 'QUALIFIED' ? 'badge-qual' : 'badge-elim'}">${t.status}</span></td>
+          <td style="display:flex; gap:6px;">
+            ${t.status === 'ELIMINATED' ? `<button onclick="undoElimination('${t.team_id}')" style="width:auto; padding:2px 6px; font-size:11px;" class="btn-warning">REVIVE</button>` : ''}
+            <button onclick="deleteTeam('${t.team_id}')" style="width:auto; padding:2px 6px; font-size:11px;" class="btn-danger">DELETE</button>
+          </td>
         </tr>`).join('');
     }
 
@@ -454,10 +493,25 @@
       try {
         const res = await fetch(`${api}/api/admin/teams`, { headers: { "x-admin-key": key } });
         const data = await res.json();
-        if (!res.ok) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">ERROR: ${data.detail || 'Failed to load teams.'}</td></tr>`; return; }
+        if (!res.ok) { tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger)">ERROR: ${data.detail || 'Failed to load teams.'}</td></tr>`; return; }
         allTeamsCache = data.teams;
         filterTeamsTable();
-      } catch (err) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">REQUEST FAILED: ${err}</td></tr>`; }
+      } catch (err) { tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger)">REQUEST FAILED: ${err}</td></tr>`; }
+    }
+
+    async function undoElimination(teamId) {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      await fetch(`${api}/api/admin/team/${teamId}/undo-elimination`, { method: "POST", headers: { "x-admin-key": key } });
+      loadAllTeams(); refreshLeaderboard();
+    }
+
+    async function deleteTeam(teamId) {
+      if (!confirm(`Permanently remove ${teamId} from database?`)) return;
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      await fetch(`${api}/api/admin/team/${teamId}`, { method: "DELETE", headers: { "x-admin-key": key } });
+      loadAllTeams(); refreshLeaderboard();
     }
 
     async function refreshLeaderboard() {
@@ -502,7 +556,7 @@
       const data = await res.json();
       if (res.ok) {
         document.getElementById('promoResult').innerHTML = `<span style="color:var(--accent)">&gt; PROMOTED: ${data.promoted_count} | ELIMINATED: ${data.eliminated_count}</span>`;
-        refreshLeaderboard(); refreshGateStatus();
+        refreshLeaderboard(); refreshGateStatus(); loadAllTeams();
       }
     }
 

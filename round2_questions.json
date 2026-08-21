@@ -16,21 +16,22 @@
       "points": 60
     }
   ],
+  "briefing": "<div class='evidence-doc'><div class='evidence-doc-title'>DOCUMENT A // INTERCEPTED LOG (NODE-02 BUFFER)</div><pre class='ascii-block'>[RESTRICTED ACCESS] INSTITUTIONAL CYBER-SECURITY LOG\nTIMESTAMP: TODAY, 04:02:11 AM\nSOURCE: DR. V. ARYA [EMERGENCY OVERRIDE CONSOLE]\nSTATUS: PAYLOAD RELAYED // PARTITION LOCK ENGAGED\n----------------------------------------------------\n\"System failsafe triggered. Master authentication key\nrouted to backup server alias:\n\n   7777 - 33 - 777 - 888 - 33 - 777\n\nIdentify the target cluster node to recover the\nphysical deactivation zone.\"\n----------------------------------------------------</pre><table class='evidence-table'><tr><th>Key</th><th>Letters</th></tr><tr><td>1</td><td>. , !</td></tr><tr><td>2</td><td>A B C</td></tr><tr><td>3</td><td>D E F</td></tr><tr><td>4</td><td>G H I</td></tr><tr><td>5</td><td>J K L</td></tr><tr><td>6</td><td>M N O</td></tr><tr><td>7</td><td>P Q R S</td></tr><tr><td>8</td><td>T U V</td></tr><tr><td>9</td><td>W X Y Z</td></tr><tr><td>0</td><td>SPACE</td></tr></table><p class='evidence-note'>Each digit is a keypad tap-count: press the key that many times to select the letter in that position.</p></div><div class='evidence-doc'><div class='evidence-doc-title'>DOCUMENT B // INFRASTRUCTURE NODE DIRECTORY</div><table class='evidence-table'><tr><th>Cluster Alias</th><th>Port</th><th>Protocol</th><th>Physical Deployment Zone</th></tr><tr><td>ROUTER</td><td>8080</td><td>TCP/IP</td><td>Central Control Hub</td></tr><tr><td>SWITCH</td><td>443</td><td>HTTPS</td><td>Networking Laboratory 01</td></tr><tr><td>FIREWALL</td><td>53</td><td>DNS</td><td>Security Operations Office</td></tr><tr><td>SERVER</td><td>22</td><td>SSH</td><td>ARCHIVE VAULT</td></tr><tr><td>GATEWAY</td><td>80</td><td>HTTP</td><td>Ground Floor Reception Desk</td></tr><tr><td>REPEATER</td><td>8443</td><td>TLS</td><td>Satellite Comms Relay Tower</td></tr></table><p class='evidence-note'>*NOTICE: Unauthorized physical entry into secured deployment zones will trigger total node purge.</p></div>",
   "hints": [
     {
       "tier": 1,
-      "point_cost": 0,
-      "text": "Look at the numbers as old mobile keypad (T9) taps, where pressing the key multiple times picks the position of the letter."
+      "point_cost": 2,
+      "text": "Notice that pressing key '7' four times maps to 'S' on a standard phone keypad."
     },
     {
       "tier": 2,
-      "point_cost": 5,
-      "text": "The sequence spells out an IT infrastructure term found in the Cluster Alias column of Document B."
+      "point_cost": 6,
+      "text": "The decoded 6-letter word matches an entry in the 'Cluster Alias' column of Document B."
     },
     {
       "tier": 3,
-      "point_cost": 10,
-      "text": "The decoded word is SERVER. Check the table for SERVER and write down its Physical Deployment Zone."
+      "point_cost": 15,
+      "text": "The word starts with 'S' and ends with 'R'. Find its corresponding physical location in Document B's 4th column."
     }
   ]
 }

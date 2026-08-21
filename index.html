@@ -24,8 +24,7 @@
     }
 
     body {
-      background:
-        radial-gradient(ellipse at top, #0a1a12 0%, var(--bg) 60%);
+      background: radial-gradient(ellipse at top, #0a1a12 0%, var(--bg) 60%);
       color: var(--accent);
       font-family: 'VT323', monospace;
       font-size: 22px;
@@ -177,7 +176,6 @@
       padding: 4px 12px; border-radius: 20px; font-size: 12px; font-family: 'Orbitron', sans-serif;
     }
 
-    /* HINT LADDER PANEL */
     .hint-panel {
       margin-top: 24px;
       border-top: 1px dashed var(--accent-dim);
@@ -213,6 +211,60 @@
       border-radius: 0 6px 6px 0;
     }
 
+    .evidence-toggle-btn {
+      background: rgba(0,255,140,0.06);
+      border: 1px solid var(--accent-dim);
+      color: var(--accent);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      padding: 12px 16px;
+      width: 100%;
+      cursor: pointer;
+      border-radius: 8px;
+      margin-top: 16px;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .evidence-toggle-btn:hover { border-color: var(--accent); background: rgba(0,255,140,0.1); }
+    .evidence-panel {
+      margin-top: 10px;
+      border: 1px dashed var(--accent-dim);
+      border-radius: 10px;
+      padding: 16px;
+      max-height: 380px;
+      overflow-y: auto;
+    }
+    .evidence-doc { margin-bottom: 18px; }
+    .evidence-doc:last-child { margin-bottom: 0; }
+    .evidence-doc-title {
+      font-family: 'Orbitron', sans-serif; font-size: 12px; color: var(--gold);
+      letter-spacing: 1px; margin-bottom: 8px; border-bottom: 1px solid var(--accent-dim);
+      padding-bottom: 6px;
+    }
+    .ascii-block {
+      white-space: pre-wrap;
+      background: rgba(0,255,140,0.04);
+      border-left: 3px solid var(--accent-dim);
+      padding: 10px 14px;
+      font-size: 15px;
+      line-height: 1.45;
+      margin-bottom: 10px;
+      border-radius: 0 6px 6px 0;
+    }
+    .evidence-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 15px; }
+    .evidence-table th, .evidence-table td { border: 1px solid var(--accent-dim); padding: 6px 8px; text-align: left; }
+    .evidence-table th {
+      background: rgba(0,255,140,0.08); color: var(--gold);
+      font-family: 'Orbitron', sans-serif; font-size: 10.5px; letter-spacing: 0.5px;
+    }
+    .evidence-note { font-size: 14px; color: #7fffb0; font-style: italic; margin-top: 4px; }
+    .suspect-card { border: 1px dashed var(--accent-dim); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+    .suspect-card:last-child { margin-bottom: 0; }
+    .suspect-name { color: var(--gold); font-family: 'Orbitron', sans-serif; font-size: 12px; margin-bottom: 6px; }
+
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.92);
       display: flex; justify-content: center; align-items: center; z-index: 200; padding: 20px;
@@ -225,19 +277,13 @@
     .modal-box.success {
       border-color: var(--accent); box-shadow: 0 0 40px rgba(0,255,140,0.6); color: var(--accent);
     }
-
-    @media (max-width: 600px) {
-      body { font-size: 19px; }
-      .terminal-card { padding: 20px; border-radius: 10px; }
-      .timer-badge { font-size: 22px; }
-    }
   </style>
 </head>
 <body oncontextmenu="return false;">
   <div class="crt-overlay"></div>
   <div class="crt-vignette"></div>
 
-  <!-- SCREEN 1: SECURE AUTH GATEWAY -->
+  <!-- SCREEN 1: LOGIN -->
   <div class="terminal-card" id="loginScreen">
     <div class="header-bar"><div>PROJECT NEXUS // SYSTEM GATEWAY</div></div>
     <p>&gt; ENTER AUTHORIZED CREDENTIALS DISPATCHED BY FACILITATORS.</p>
@@ -247,38 +293,43 @@
     <div id="loginMsg" class="warning-text"></div>
   </div>
 
-  <!-- SCREEN 1B: WAITING FOR ADMIN TO OPEN THE ROUND -->
+  <!-- SCREEN 1B: WAITING FOR ADMIN -->
   <div class="terminal-card hidden" id="waitingRoundScreen">
     <div class="header-bar"><div>PROJECT NEXUS // HOLDING PATTERN</div></div>
     <p><span class="pulse-dot"></span>STANDING BY: ROUND <span id="waitingRoundNum">-</span> HAS NOT BEEN OPENED BY THE ADMIN YET.</p>
-    <p class="muted-text">This screen advances automatically the instant the round is unlocked. Do not refresh — credentials are already verified and your place is held.</p>
+    <p class="muted-text">This screen advances automatically the instant the round is unlocked.</p>
   </div>
 
-  <!-- SCREEN 1C: PRE-ROUND START SCREEN -->
+  <!-- SCREEN 1C: PRE-ROUND BRIEFING -->
   <div class="terminal-card hidden" id="startScreen">
     <div class="header-bar">
       <div>PROJECT NEXUS // ROUND <span id="startRoundNum">-</span> BRIEFING</div>
       <div class="badge-pill" id="startTeamBadge">TEAM: ---</div>
     </div>
     <div class="instructions-box">
-      &gt; <span id="startInstructions">Answer each question before the per-question timer expires. Switching tabs is monitored and penalized. Hints are available for a point cost. Once you click START, the attempt cannot be restarted.</span>
+      &gt; <span id="startInstructions">Round 1: 30 seconds per question. Switching tabs is strictly monitored. Hints deduct points. Once started, attempt cannot be restarted.</span>
     </div>
     <p class="muted-text" id="resumeNotice"></p>
-    <p class="muted-text">Mission clock (elapsed since round opened): <span id="missionClock">00:00</span></p>
+    <p class="muted-text">Mission clock: <span id="missionClock">00:00</span></p>
+
+    <button class="evidence-toggle-btn hidden" id="evidenceToggleBtn">
+      <span>📁 ACCESS CASE FILES / EVIDENCE ARCHIVE</span><span id="evidenceToggleIcon">▾</span>
+    </button>
+    <div class="evidence-panel hidden" id="evidencePanel"></div>
+
     <button class="action-btn" id="startRoundBtn">START ROUND</button>
   </div>
 
-  <!-- SCREEN 2: ACTIVE ASSESSMENT TERMINAL -->
+  <!-- SCREEN 2: ACTIVE ASSESSMENT -->
   <div class="terminal-card hidden" id="quizScreen">
     <div class="header-bar">
       <div id="teamDisplay">TEAM: ---</div>
       <div id="progressDisplay">NODE 1/--</div>
-      <div class="timer-badge" id="timer">45s</div>
+      <div class="timer-badge" id="timer">30s</div>
     </div>
     <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
 
     <div id="questionText" style="font-size: 24px; min-height: 55px; line-height: 1.3;"></div>
-
     <div class="options-grid" id="optionsContainer"></div>
 
     <div id="textInputContainer" class="hidden">
@@ -293,14 +344,14 @@
     </div>
   </div>
 
-  <!-- SCREEN 3: RESULT & REAL-TIME BROADCAST -->
+  <!-- SCREEN 3: END / POLLING FOR STATUS -->
   <div class="terminal-card hidden" id="endScreen">
     <div class="header-bar"><div>TRANSMISSION SUMMARY // PROJECT NEXUS</div></div>
     <p id="endStatus">&gt; LOGS SYNCED TO CENTRAL REPOSITORY.</p>
     <p id="subReason" style="margin-top: 10px; color: var(--gold);"></p>
 
     <div id="eliminationStatusArea" style="margin-top: 25px; border-top: 1px dashed var(--accent-dim); padding-top: 15px;">
-      <p id="waitingMsg"><span class="pulse-dot"></span>STANDING BY: POLLING CENTRAL NETWORK FOR UNIVERSAL ROUND COMPLETION...</p>
+      <p id="waitingMsg"><span class="pulse-dot"></span>STANDING BY: POLLING CENTRAL NETWORK FOR ADVANCEMENT STATUS...</p>
     </div>
   </div>
 
@@ -326,12 +377,12 @@
     const BACKEND_URL = "https://project-victory-production-d780.up.railway.app";
 
     let questions = [];
-    let roundHints = [];       // [{tier, point_cost}] — text arrives only on request
-    let hintsUsed = [];        // tiers unlocked so far, e.g. [1, 2]
+    let roundHints = [];
+    let hintsUsed = [];
     let currentQIdx = 0;
     let timerInterval = null;
     let missionClockInterval = null;
-    let timeLeft = 45;
+    let timeLeft = 30;
     let teamId = "", teamPassword = "", teamName = "";
     let activeRound = 1;
     let roundOpenedAtMs = null;
@@ -341,6 +392,7 @@
     let quizActive = false;
     let isSubmitting = false;
     let roundWaitPoll = null;
+    let statusPollInterval = null;
     let localElapsedSeconds = 0;
     let totalTimerInterval = null;
 
@@ -375,7 +427,7 @@
           activeRound = extractRoundFromMessage(data.detail) || activeRound;
           document.getElementById('waitingRoundNum').innerText = activeRound;
           showScreen('waitingRoundScreen');
-          if (!roundWaitPoll) roundWaitPoll = setInterval(() => attemptLogin(true), 5000);
+          if (!roundWaitPoll) roundWaitPoll = setInterval(() => attemptLogin(true), 4000);
           return;
         }
 
@@ -402,9 +454,10 @@
         const qData = await qRes.json();
         questions = qData.questions || [];
         roundHints = qData.hints || [];
+        renderEvidencePanel(qData.briefing || "");
 
         if (questions.length === 0) {
-          msg.innerText = "[!] ERROR: NO QUESTIONS CONFIGURED FOR THIS ROUND BY ADMIN.";
+          msg.innerText = "[!] ERROR: NO QUESTIONS CONFIGURED FOR THIS ROUND.";
           showScreen('loginScreen');
           return;
         }
@@ -415,7 +468,7 @@
 
         const resumeNotice = document.getElementById('resumeNotice');
         resumeNotice.innerText = (data.resume.resumed && currentQIdx > 0)
-          ? `> SESSION RESTORED: Resuming from Node ${currentQIdx + 1}/${questions.length}. Prior strikes (${tabSwitchCount}) and hints used carried over.`
+          ? `> SESSION RESTORED: Resuming from Node ${currentQIdx + 1}/${questions.length}.`
           : "";
 
         startMissionClock();
@@ -424,6 +477,27 @@
         if (!isSilentRetry) { msg.innerText = "[!] BACKEND UNREACHABLE. CHECK SERVER."; showScreen('loginScreen'); }
       }
     }
+
+    function renderEvidencePanel(briefingHtml) {
+      const toggleBtn = document.getElementById('evidenceToggleBtn');
+      const panel = document.getElementById('evidencePanel');
+      panel.classList.add('hidden');
+      document.getElementById('evidenceToggleIcon').innerText = '▾';
+      if (!briefingHtml || !briefingHtml.trim()) {
+        toggleBtn.classList.add('hidden');
+        panel.innerHTML = '';
+        return;
+      }
+      toggleBtn.classList.remove('hidden');
+      panel.innerHTML = briefingHtml;
+    }
+
+    document.getElementById('evidenceToggleBtn').addEventListener('click', () => {
+      const panel = document.getElementById('evidencePanel');
+      const icon = document.getElementById('evidenceToggleIcon');
+      const nowHidden = panel.classList.toggle('hidden');
+      icon.innerText = nowHidden ? '▾' : '▴';
+    });
 
     function extractRoundFromMessage(detail) {
       if (!detail) return null;
@@ -484,7 +558,7 @@
       if (currentQIdx >= questions.length) { finishQuiz("NORMAL_COMPLETION"); return; }
 
       clearInterval(timerInterval);
-      timeLeft = 45;
+      timeLeft = (activeRound === 1) ? 30 : 45; // 30 seconds for round 1
       updateTimerDisplay();
 
       const q = questions[currentQIdx];
@@ -550,7 +624,6 @@
       }).catch(() => {});
     }
 
-    // --- HINT LADDER (round-level: applies to the whole round, matches printed rubric) ---
     function renderHintPanel() {
       const panel = document.getElementById('hintPanel');
       const btnWrap = document.getElementById('hintTierButtons');
@@ -602,9 +675,9 @@
       showScreen('endScreen');
 
       if (statusReason === "DISQUALIFIED") {
-        document.getElementById('subReason').innerText = "> NOTICE: IMMEDIATE DISQUALIFICATION TRIGGERED (ROUND 2+ ZERO-TOLERANCE BREACH).";
+        document.getElementById('subReason').innerText = "> NOTICE: IMMEDIATE DISQUALIFICATION TRIGGERED.";
       } else if (statusReason === "TERMINATED_DUE_TO_TAB_SWITCHING") {
-        document.getElementById('subReason').innerText = "> NOTICE: SESSION FORCE-TERMINATED (STRIKE 2 EXCEEDED).";
+        document.getElementById('subReason').innerText = "> NOTICE: SESSION FORCE-TERMINATED.";
       }
 
       try {
@@ -628,38 +701,38 @@
     }
 
     function startUniversalStatusPolling() {
-      const pollInterval = setInterval(async () => {
+      if (statusPollInterval) clearInterval(statusPollInterval);
+      statusPollInterval = setInterval(async () => {
         try {
           const res = await fetch(`${BACKEND_URL}/api/team/status/${teamId}`);
           const data = await res.json();
 
-          if (data.all_teams_finished) {
-            clearInterval(pollInterval);
-            const statusArea = document.getElementById('eliminationStatusArea');
-            if (data.status === "ELIMINATED") {
-              statusArea.innerHTML = `
-                <div style="background: rgba(45,0,10,0.85); border: 2px solid var(--danger); border-radius: 10px; padding: 22px; text-align: center; color: var(--danger);">
-                  <h2 style="font-family:'Orbitron'; font-size: 24px;">[X] TOURNAMENT ELIMINATION NOTICE</h2>
-                  <p style="color: #fff; margin-top: 10px; font-size: 19px;">ALL TEAMS HAVE CONCLUDED THE CURRENT ROUND.<br>BASED ON FINAL SCORES AND TIE-BREAKER PARAMETERS, YOUR TEAM HAS NOT ADVANCED.</p>
-                </div>`;
-            } else {
-              statusArea.innerHTML = `
-                <div style="background: rgba(0,40,20,0.85); border: 2px solid var(--accent); border-radius: 10px; padding: 22px; text-align: center; color: var(--accent);">
-                  <h2 style="font-family:'Orbitron'; font-size: 24px;">[✓] ADVANCEMENT CONFIRMED</h2>
-                  <p style="color: #fff; margin-top: 10px; font-size: 19px;">ALL TEAMS HAVE FINISHED. YOUR TEAM HAS BEEN PROMOTED TO ROUND ${data.current_round}.</p>
-                </div>`;
-              document.getElementById('clearedMsg').innerText = `Your team cleared this round and has been promoted to Round ${data.current_round}.`;
-              document.getElementById('clearedModal').classList.remove('hidden');
-            }
+          const statusArea = document.getElementById('eliminationStatusArea');
+          if (data.status === "ELIMINATED") {
+            clearInterval(statusPollInterval);
+            statusArea.innerHTML = `
+              <div style="background: rgba(45,0,10,0.85); border: 2px solid var(--danger); border-radius: 10px; padding: 22px; text-align: center; color: var(--danger);">
+                <h2 style="font-family:'Orbitron'; font-size: 24px;">[X] TOURNAMENT ELIMINATION NOTICE</h2>
+                <p style="color: #fff; margin-top: 10px; font-size: 19px;">ALL TEAMS HAVE CONCLUDED THE CURRENT ROUND.<br>YOUR TEAM HAS BEEN ELIMINATED AND WILL NOT ADVANCE.</p>
+              </div>`;
+          } else if (data.current_round > activeRound) {
+            clearInterval(statusPollInterval);
+            statusArea.innerHTML = `
+              <div style="background: rgba(0,40,20,0.85); border: 2px solid var(--accent); border-radius: 10px; padding: 22px; text-align: center; color: var(--accent);">
+                <h2 style="font-family:'Orbitron'; font-size: 24px;">[✓] ADVANCEMENT CONFIRMED</h2>
+                <p style="color: #fff; margin-top: 10px; font-size: 19px;">PROMOTED TO ROUND ${data.current_round}.</p>
+              </div>`;
+            document.getElementById('clearedMsg').innerText = `Your team cleared Round ${activeRound} and has advanced to Round ${data.current_round}!`;
+            document.getElementById('clearedModal').classList.remove('hidden');
           }
         } catch (e) { console.error(e); }
-      }, 4000);
+      }, 3000);
     }
 
     document.getElementById('proceedNextRoundBtn').addEventListener('click', () => {
       document.getElementById('clearedModal').classList.add('hidden');
       currentQIdx = 0; answers = {}; tabSwitchCount = 0; warnedAlready = false;
-      hintsUsed = []; questions = []; roundHints = []; isSubmitting = false;
+      hintsUsed = []; questions = []; roundHints = []; isSubmitting = false; localElapsedSeconds = 0;
       document.getElementById('hintTextArea').innerHTML = '';
       document.getElementById('loginMsg').innerText = "";
       attemptLogin();

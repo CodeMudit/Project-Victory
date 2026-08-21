@@ -20,6 +20,7 @@
       "correct_answer": "SEN"
     }
   ],
+  "briefing": "<div class='evidence-doc'><div class='evidence-doc-title'>EMERGENCY ACCESS CARD // LEVEL 5 CLEARANCE</div><pre class='ascii-block'>[ LEVEL 5 EMERGENCY CLEARANCE ]\nNEXUS CORE // MAINFRAME OVERRIDE PORTAL\n\nWIPE SEQUENCE DETECTED.\nTO INITIATE MANUAL OVERRIDE, THREE SECURITY\nCLEARANCE GATES MUST BE PASSED IN SEQUENCE.\n\nREQUIREMENTS:\nHave your Mission Artifacts from the previous rounds\nready. You cannot guess the system overrides.</pre></div><div class='evidence-doc'><div class='evidence-doc-title'>TERMINAL GATE REFERENCE</div><table class='evidence-table'><tr><th>Gate</th><th>Prompt Displayed</th><th>Source Artifact</th></tr><tr><td>Gate 1</td><td>ENTER TARGET CLUSTER ALIAS</td><td>Round 2 decoded word (T9 cipher)</td></tr><tr><td>Gate 2</td><td>ENTER COMPROMISED TERMINAL ID</td><td>Round 3 telemetry ticket (File 02)</td></tr><tr><td>Gate 3</td><td>ENTER TRAITOR'S SURNAME</td><td>Round 3 culprit identity</td></tr></table><p class='evidence-note'>Each gate validates automatically the instant a correct entry is submitted. There is no partial credit for a wrong override attempt — check your artifacts before you type.</p></div>",
   "hints": [
     {
       "tier": 1,
