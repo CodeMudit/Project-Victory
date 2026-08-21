@@ -19,5 +19,12 @@
       "text": "GATE 3 — ENTER TRAITOR'S SURNAME:",
       "correct_answer": "SEN"
     }
+  ],
+  "hints": [
+    {
+      "tier": 1,
+      "point_cost": 0,
+      "text": "Remember your mission artifacts. Gate 1 is your Round 2 answer. Gates 2 and 3 are your Round 3 answers."
+    }
   ]
 }

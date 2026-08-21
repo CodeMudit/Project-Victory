@@ -4,83 +4,118 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PROJECT NEXUS // COMMAND MATRIX</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #03070d;
-      color: #00ffcc;
-      font-family: 'Share Tech Mono', monospace;
-      padding: 24px;
-      font-size: 15px;
+    :root {
+      --accent: #00e5c7;
+      --accent-dim: #00e5c733;
+      --gold: #ffb833;
+      --danger: #ff4d6d;
+      --bg: #05090f;
     }
-    h1, h2, h3 { font-family: 'Orbitron', sans-serif; color: #00ffcc; text-shadow: 0 0 10px rgba(0,255,204,0.5); }
-    h1 { font-size: 26px; margin-bottom: 20px; border-bottom: 1px solid #00ffcc44; padding-bottom: 10px; }
-    h2 { font-size: 18px; margin-bottom: 12px; }
-    .layout-grid { display: grid; grid-template-columns: 1.1fr 1.9fr; gap: 20px; }
+    body {
+      background: radial-gradient(ellipse at top, #0a1420 0%, var(--bg) 65%);
+      color: var(--accent);
+      font-family: 'Share Tech Mono', monospace;
+      padding: 26px;
+      font-size: 14px;
+    }
+    h1, h2, h3 { font-family: 'Orbitron', sans-serif; color: var(--accent); }
+    h1 { font-size: 23px; margin-bottom: 22px; border-bottom: 1px solid var(--accent-dim); padding-bottom: 14px; letter-spacing: 0.5px; }
+    h2 { font-size: 16px; margin-bottom: 14px; letter-spacing: 0.3px; }
+    .layout-grid { display: grid; grid-template-columns: 1.1fr 1.9fr; gap: 22px; }
     .card {
-      background: rgba(8, 18, 30, 0.95);
-      border: 1px solid #00ffcc;
-      border-radius: 6px;
-      padding: 20px;
-      box-shadow: 0 0 15px rgba(0,255,204,0.15);
-      margin-bottom: 20px;
+      background: rgba(8, 16, 26, 0.9);
+      border: 1px solid var(--accent-dim);
+      border-radius: 12px;
+      padding: 22px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 30px rgba(0,229,199,0.06);
+      margin-bottom: 22px;
     }
     input, button, select, textarea {
       font-family: 'Share Tech Mono', monospace;
-      padding: 10px 12px;
-      background: #040a12;
-      border: 1px solid #00ffcc;
-      color: #00ffcc;
-      font-size: 15px;
+      padding: 10px 13px;
+      background: rgba(0,229,199,0.04);
+      border: 1px solid var(--accent-dim);
+      color: var(--accent);
+      font-size: 14px;
       width: 100%;
       margin-bottom: 10px;
-      border-radius: 3px;
+      border-radius: 6px;
     }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
     button {
-      background: #00ffcc;
-      color: #03070d;
+      background: var(--accent);
+      color: #041018;
       font-weight: bold;
       cursor: pointer;
       border: none;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
     }
-    button:hover { background: #66ffdd; box-shadow: 0 0 10px #00ffcc; }
-    .btn-danger { background: #ff3366; color: #fff; }
-    .btn-danger:hover { background: #ff6688; box-shadow: 0 0 10px #ff3366; }
-    .btn-warning { background: #ffaa00; color: #000; }
+    button:hover { filter: brightness(1.15); box-shadow: 0 4px 14px rgba(0,229,199,0.3); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-warning { background: var(--gold); color: #221800; }
     .q-item-card {
-      background: rgba(0, 30, 40, 0.6);
-      border: 1px dashed #00ffcc88;
-      padding: 12px;
+      background: rgba(0,229,199,0.04);
+      border: 1px dashed var(--accent-dim);
+      padding: 14px;
       margin-bottom: 12px;
-      border-radius: 4px;
+      border-radius: 8px;
+    }
+    .hint-item-card {
+      background: rgba(255,184,51,0.05);
+      border: 1px dashed #ffb83355;
+      padding: 14px;
+      margin-bottom: 12px;
+      border-radius: 8px;
     }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #00ffcc33; padding: 8px 10px; text-align: left; }
-    th { background: #002220; color: #00ffcc; }
-    .rank-1 { color: #ffff00; font-weight: bold; }
-    .elim-row { color: #ff5566; }
-    .badge { padding: 3px 6px; font-size: 12px; border-radius: 3px; }
-    .badge-qual { background: #00ffcc22; color: #00ffcc; border: 1px solid #00ffcc; }
-    .badge-elim { background: #ff336622; color: #ff3366; border: 1px solid #ff3366; }
+    th, td { border: 1px solid var(--accent-dim); padding: 9px 10px; text-align: left; }
+    th { background: rgba(0,229,199,0.08); color: var(--accent); font-family: 'Orbitron', sans-serif; font-size: 12px; }
+    .rank-1 { color: var(--gold); font-weight: bold; }
+    .elim-row { color: var(--danger); }
+    .badge { padding: 3px 8px; font-size: 11px; border-radius: 5px; font-family: 'Orbitron', sans-serif; }
+    .badge-qual { background: rgba(0,229,199,0.12); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-elim { background: rgba(255,77,109,0.12); color: var(--danger); border: 1px solid var(--danger); }
+    .badge-open { background: rgba(0,255,140,0.12); color: #00ff8c; border: 1px solid #00ff8c; }
+    .badge-locked { background: rgba(255,184,51,0.12); color: var(--gold); border: 1px solid var(--gold); }
+    .gate-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .gate-row select { margin-bottom: 0; }
+    .muted { font-size: 12px; color: #7a8a94; }
   </style>
 </head>
 <body>
 
   <h1>// PROJECT NEXUS: COMMAND MATRIX & LIVE ENGINE</h1>
 
-  <!-- GLOBAL CONFIG HEADER -->
-  <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+  <div style="display: flex; gap: 15px; margin-bottom: 22px; align-items: center; flex-wrap: wrap;">
     <input type="text" id="apiBase" value="https://project-victory-production-d780.up.railway.app" placeholder="BACKEND API URL" style="max-width: 320px; margin: 0;">
     <input type="password" id="adminKey" value="" placeholder="ADMIN SECRET KEY" style="max-width: 250px; margin: 0;" oninput="localStorage.setItem('nexusAdminKey', this.value)">
     <button onclick="refreshLeaderboard()" style="width: auto; padding: 10px 20px;">SYNC DASHBOARD</button>
   </div>
 
+  <!-- ROUND GATE CONTROL -->
+  <div class="card">
+    <h2>&gt; ROUND GATE CONTROL</h2>
+    <p class="muted" style="margin-bottom: 12px;">Teams cannot log in to a round until it is OPENED here. The scoring clock for every team starts the moment you open it.</p>
+    <div class="gate-row">
+      <select id="gateRoundSelect" onchange="refreshGateStatus()" style="max-width: 160px;">
+        <option value="1">Round 1</option><option value="2">Round 2</option>
+        <option value="3">Round 3</option><option value="4">Round 4</option>
+      </select>
+      <span id="gateStatusBadge" class="badge badge-locked">LOCKED</span>
+      <span id="gateOpenedAt" class="muted"></span>
+      <div style="flex: 1;"></div>
+      <button onclick="openRound()" style="width: auto; padding: 10px 18px;">OPEN ROUND</button>
+      <button onclick="closeRound()" class="btn-danger" style="width: auto; padding: 10px 18px;">CLOSE ROUND</button>
+    </div>
+    <div id="gateMsg" style="font-size: 12px; margin-top: 6px;"></div>
+  </div>
+
   <div class="layout-grid">
-    <!-- LEFT COLUMN: QUESTION BANK EDITOR & CREDENTIAL DISPATCH -->
     <div>
-      <!-- 1. LIVE QUESTION BANK & KEY EDITOR -->
+      <!-- QUESTION BANK EDITOR -->
       <div class="card">
         <h2>&gt; QUESTION & ANSWER-KEY MANAGER</h2>
         <div style="display: flex; gap: 10px;">
@@ -92,105 +127,75 @@
           </select>
           <button onclick="addBlankQuestion()" style="width: 140px;">+ ADD NODE</button>
         </div>
-
-        <div id="questionListContainer" style="max-height: 480px; overflow-y: auto; margin-top: 15px; padding-right: 5px;"></div>
-        
-        <button onclick="saveQuestionBank()" class="btn-warning" style="margin-top: 10px;">SAVE & SYNC QUESTIONS TO DB</button>
-        <div id="qSaveMsg" style="font-size: 13px; margin-top: 6px;"></div>
+        <div id="questionListContainer" style="max-height: 420px; overflow-y: auto; margin-top: 15px; padding-right: 5px;"></div>
+        <button onclick="saveQuestionBank()" class="btn-warning" style="margin-top: 10px;">SAVE & SYNC TO DB</button>
+        <div id="qSaveMsg" style="font-size: 12px; margin-top: 6px;"></div>
       </div>
 
-      <!-- 2. TEAM REGISTRATION -->
+      <!-- HINT LADDER EDITOR -->
+      <div class="card">
+        <h2>&gt; HINT LADDER MANAGER</h2>
+        <p class="muted" style="margin-bottom: 10px;">Round-level hints (apply to the whole round, matching the printed hint rubric). Tier 1 is conventionally free; deeper tiers cost points.</p>
+        <div id="hintListContainer" style="max-height: 260px; overflow-y: auto;"></div>
+        <button onclick="addBlankHint()" style="width: auto; padding: 8px 16px;">+ ADD HINT TIER</button>
+        <div id="hintSaveNote" class="muted" style="margin-top: 8px;">Hints save together with the question bank above — click SAVE & SYNC TO DB when done.</div>
+      </div>
+
+      <!-- TEAM REGISTRATION -->
       <div class="card">
         <h2>&gt; CREDENTIAL GENERATOR</h2>
         <div style="display: flex; gap: 10px;">
           <input type="number" id="teamCountInput" value="10" min="1" max="200" placeholder="NUMBER OF TEAMS" style="flex: 1;">
           <button onclick="renderTeamNameInputs()" style="width: 160px;">SET TEAM COUNT</button>
         </div>
-
-        <div id="teamNameInputsContainer" style="max-height: 300px; overflow-y: auto; margin: 10px 0;"></div>
-
+        <div id="teamNameInputsContainer" style="max-height: 280px; overflow-y: auto; margin: 10px 0;"></div>
         <button onclick="generateAllTeamCredentials()" class="btn-warning" id="generateAllBtn" style="display: none;">GENERATE ALL TEAM ID'S & ACCESS KEYS</button>
-        <div id="credGenMsg" style="font-size: 13px; margin-top: 6px;"></div>
+        <div id="credGenMsg" style="font-size: 12px; margin-top: 6px;"></div>
       </div>
 
-      <!-- 3. ALL TEAM CREDENTIALS (persists across admin sessions, always pulled from DB) -->
+      <!-- ALL TEAM CREDENTIALS -->
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <h2>&gt; ALL TEAM CREDENTIALS</h2>
           <button onclick="loadAllTeams()" style="width: auto; padding: 6px 14px;">REFRESH</button>
         </div>
-        <input type="text" id="teamSearchInput" placeholder="SEARCH BY TEAM ID OR NAME (E.G. NEX-4920)" style="text-transform: uppercase;" oninput="filterTeamsTable()">
+        <input type="text" id="teamSearchInput" placeholder="SEARCH BY TEAM ID OR NAME" style="text-transform: uppercase;" oninput="filterTeamsTable()">
         <table>
-          <thead>
-            <tr>
-              <th>Team ID</th>
-              <th>Team Name</th>
-              <th>Access Key</th>
-              <th>Round</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="allTeamsBody">
-            <tr><td colspan="5">Loading...</td></tr>
-          </tbody>
+          <thead><tr><th>Team ID</th><th>Team Name</th><th>Access Key</th><th>Round</th><th>Status</th></tr></thead>
+          <tbody id="allTeamsBody"><tr><td colspan="5">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
 
-    <!-- RIGHT COLUMN: LEADERBOARDS & PROMOTION ENGINE -->
     <div>
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <h2>&gt; ROUND <span id="viewingRoundNum">1</span> LIVE TOURNAMENT RANKINGS</h2>
           <div style="width: 150px;">
             <select id="boardRoundSelect" onchange="refreshLeaderboard()">
-              <option value="1">Round 1</option>
-              <option value="2">Round 2</option>
-              <option value="3">Round 3</option>
-              <option value="4">Round 4</option>
+              <option value="1">Round 1</option><option value="2">Round 2</option>
+              <option value="3">Round 3</option><option value="4">Round 4</option>
             </select>
           </div>
         </div>
-
-        <div id="liveTelemetry" style="margin: 10px 0; font-size: 14px; color: #aaa;"></div>
-
+        <div id="liveTelemetry" style="margin: 10px 0; font-size: 13px; color: #9fb0b8;"></div>
         <table>
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Team ID</th>
-              <th>Team Name</th>
-              <th>Score</th>
-              <th>Time</th>
-              <th>Switches</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="boardBody">
-            <tr><td colspan="7">No submissions recorded.</td></tr>
-          </tbody>
+          <thead><tr><th>Rank</th><th>Team ID</th><th>Team Name</th><th>Score</th><th>Hints</th><th>Time</th><th>Switches</th><th>Status</th></tr></thead>
+          <tbody id="boardBody"><tr><td colspan="8">No submissions recorded.</td></tr></tbody>
         </table>
       </div>
 
-      <!-- PROMOTION AUTOMATOR -->
       <div class="card">
         <h2>&gt; TOURNAMENT PROMOTION AUTOMATOR</h2>
-        <p style="font-size: 13px; color: #888; margin-bottom: 12px;">Tie-Breaker Hierarchy: Score (Desc) &gt; Time Taken (Asc) &gt; Tab Switches (Asc)</p>
+        <p class="muted" style="margin-bottom: 12px;">Tie-Breaker Hierarchy: Score (Desc) &gt; Time Taken (Asc) &gt; Tab Switches (Asc). Time Taken is measured server-side from when you opened the round.</p>
         <div style="display: flex; gap: 15px;">
-          <div style="flex: 1;">
-            <label>Promote Top N Teams:</label>
-            <input type="number" id="promoteTopN" value="10" min="1">
-          </div>
-          <div style="flex: 1;">
-            <label>Target Round:</label>
-            <select id="promoteTargetRound">
-              <option value="2">Round 2</option>
-              <option value="3">Round 3</option>
-              <option value="4">Round 4</option>
-            </select>
+          <div style="flex: 1;"><label>Promote Top N Teams:</label><input type="number" id="promoteTopN" value="10" min="1"></div>
+          <div style="flex: 1;"><label>Target Round:</label>
+            <select id="promoteTargetRound"><option value="2">Round 2</option><option value="3">Round 3</option><option value="4">Round 4</option></select>
           </div>
         </div>
         <button onclick="executePromotion()" class="btn-warning">EXECUTE PROMOTION & LOCK ROUND</button>
+        <p class="muted" style="margin-top: 6px;">The target round is left CLOSED after promotion — open it from Round Gate Control above when ready.</p>
         <div id="promoResult" style="margin-top: 8px;"></div>
       </div>
     </div>
@@ -198,57 +203,98 @@
 
   <script>
     let currentQuestions = [];
+    let currentHints = [];
 
-    // --- QUESTION EDITOR LOGIC ---
+    // --- ROUND GATE CONTROL ---
+    async function refreshGateStatus() {
+      const api = document.getElementById('apiBase').value;
+      const round = document.getElementById('gateRoundSelect').value;
+      const badge = document.getElementById('gateStatusBadge');
+      const openedAtEl = document.getElementById('gateOpenedAt');
+      try {
+        const res = await fetch(`${api}/api/round/${round}/status`);
+        const data = await res.json();
+        if (data.is_open) {
+          badge.className = 'badge badge-open'; badge.innerText = 'OPEN';
+          openedAtEl.innerText = data.opened_at ? `Opened: ${new Date(data.opened_at).toLocaleTimeString()}` : '';
+        } else {
+          badge.className = 'badge badge-locked'; badge.innerText = 'LOCKED';
+          openedAtEl.innerText = '';
+        }
+      } catch (err) { badge.className = 'badge badge-locked'; badge.innerText = 'UNKNOWN'; }
+    }
+
+    async function openRound() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const round = document.getElementById('gateRoundSelect').value;
+      const msg = document.getElementById('gateMsg');
+      if (!confirm(`Open Round ${round}? The scoring clock starts for ALL teams the moment you confirm.`)) return;
+      try {
+        const res = await fetch(`${api}/api/admin/round/${round}/open`, { method: "POST", headers: { "x-admin-key": key } });
+        const data = await res.json();
+        if (res.ok) { msg.innerHTML = `<span style="color:var(--accent)">&gt; ROUND ${round} IS NOW OPEN.</span>`; refreshGateStatus(); }
+        else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
+      } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
+    }
+
+    async function closeRound() {
+      const api = document.getElementById('apiBase').value;
+      const key = document.getElementById('adminKey').value;
+      const round = document.getElementById('gateRoundSelect').value;
+      const msg = document.getElementById('gateMsg');
+      if (!confirm(`Close Round ${round}? Teams who haven't logged in yet will be held at the waiting screen.`)) return;
+      try {
+        const res = await fetch(`${api}/api/admin/round/${round}/close`, { method: "POST", headers: { "x-admin-key": key } });
+        const data = await res.json();
+        if (res.ok) { msg.innerHTML = `<span style="color:var(--gold)">&gt; ROUND ${round} IS NOW LOCKED.</span>`; refreshGateStatus(); }
+        else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
+      } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
+    }
+
+    // --- QUESTION + HINT EDITOR ---
     async function loadQuestionsForEditing() {
       const api = document.getElementById('apiBase').value;
       const key = document.getElementById('adminKey').value;
       const round = document.getElementById('editRoundSelect').value;
-
       try {
-        const res = await fetch(`${api}/api/admin/questions/${round}`, {
-          headers: { "x-admin-key": key }
-        });
+        const res = await fetch(`${api}/api/admin/questions/${round}`, { headers: { "x-admin-key": key } });
         const data = await res.json();
         currentQuestions = data.questions || [];
+        currentHints = data.hints || [];
         renderQuestionEditor();
-      } catch (err) {
-        console.error(err);
-      }
+        renderHintEditor();
+      } catch (err) { console.error(err); }
     }
 
     function renderQuestionEditor() {
       const container = document.getElementById('questionListContainer');
       container.innerHTML = "";
-
       if (currentQuestions.length === 0) {
-        container.innerHTML = "<p style='color:#777;'>No questions loaded for this round. Click '+ ADD NODE' to begin.</p>";
+        container.innerHTML = "<p class='muted'>No questions loaded for this round. Click '+ ADD NODE' to begin.</p>";
         return;
       }
-
       currentQuestions.forEach((q, idx) => {
         const qCard = document.createElement('div');
         qCard.className = 'q-item-card';
         qCard.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <strong>NODE #${idx + 1} (${q.id})</strong>
-            <button onclick="removeQuestion(${idx})" class="btn-danger" style="width: auto; padding: 2px 8px; font-size: 12px;">DELETE</button>
+            <button onclick="removeQuestion(${idx})" class="btn-danger" style="width: auto; padding: 2px 8px; font-size: 11px;">DELETE</button>
           </div>
           <input type="text" value="${q.text}" onchange="currentQuestions[${idx}].text = this.value" placeholder="Question Text">
-          
           <div style="display: flex; gap: 10px;">
             <select onchange="changeQuestionType(${idx}, this.value)" style="flex: 1;">
               <option value="text" ${q.type === 'text' ? 'selected' : ''}>Fill in the Blank</option>
               <option value="mcq" ${q.type === 'mcq' ? 'selected' : ''}>Multiple Choice (MCQ)</option>
             </select>
-            <input type="text" value="${q.correct_answer}" onchange="currentQuestions[${idx}].correct_answer = this.value" placeholder="Exact Correct Answer" style="flex: 1; border-color: #ffff00; color: #ffff00;">
+            <input type="text" value="${q.correct_answer}" onchange="currentQuestions[${idx}].correct_answer = this.value" placeholder="Exact Correct Answer" style="flex: 1; border-color: var(--gold); color: var(--gold);">
+            <input type="number" value="${q.points || 4}" onchange="currentQuestions[${idx}].points = parseInt(this.value)||4" placeholder="Points" style="width: 90px; border-color: var(--gold); color: var(--gold);">
           </div>
-
           ${q.type === 'mcq' ? `
             <div style="margin-top: 6px;">
-              <textarea placeholder="Options JSON format. E.g: [{'k':'A','t':'Opt 1'}, {'k':'B','t':'Opt 2'}]" onchange="updateMcqOptions(${idx}, this.value)" style="height: 65px; font-size: 12px;">${JSON.stringify(q.options || [])}</textarea>
-            </div>
-          ` : ''}
+              <textarea placeholder="Options JSON. E.g: [{'k':'A','t':'Opt 1'}]" onchange="updateMcqOptions(${idx}, this.value)" style="height: 60px; font-size: 12px;">${JSON.stringify(q.options || [])}</textarea>
+            </div>` : ''}
         `;
         container.appendChild(qCard);
       });
@@ -257,15 +303,8 @@
     function addBlankQuestion() {
       const newId = `Q${currentQuestions.length + 1}`;
       currentQuestions.push({
-        id: newId,
-        type: "mcq",
-        text: "New Question Text",
-        options: [
-          { k: "A", t: "Option 1" },
-          { k: "B", t: "Option 2" },
-          { k: "C", t: "Option 3" },
-          { k: "D", t: "Option 4" }
-        ],
+        id: newId, type: "mcq", text: "New Question Text", points: 4,
+        options: [{k:"A",t:"Option 1"},{k:"B",t:"Option 2"},{k:"C",t:"Option 3"},{k:"D",t:"Option 4"}],
         correct_answer: "A"
       });
       renderQuestionEditor();
@@ -273,7 +312,6 @@
 
     function removeQuestion(index) {
       currentQuestions.splice(index, 1);
-      // Re-index IDs
       currentQuestions.forEach((q, i) => q.id = `Q${i + 1}`);
       renderQuestionEditor();
     }
@@ -281,22 +319,50 @@
     function changeQuestionType(index, type) {
       currentQuestions[index].type = type;
       if (type === 'mcq' && (!currentQuestions[index].options || currentQuestions[index].options.length === 0)) {
-        currentQuestions[index].options = [
-          { k: "A", t: "Option 1" },
-          { k: "B", t: "Option 2" },
-          { k: "C", t: "Option 3" },
-          { k: "D", t: "Option 4" }
-        ];
+        currentQuestions[index].options = [{k:"A",t:"Option 1"},{k:"B",t:"Option 2"},{k:"C",t:"Option 3"},{k:"D",t:"Option 4"}];
       }
       renderQuestionEditor();
     }
 
     function updateMcqOptions(index, jsonStr) {
-      try {
-        currentQuestions[index].options = JSON.parse(jsonStr);
-      } catch(e) {
-        alert("Invalid Options JSON format!");
+      try { currentQuestions[index].options = JSON.parse(jsonStr); }
+      catch(e) { alert("Invalid Options JSON format!"); }
+    }
+
+    function renderHintEditor() {
+      const container = document.getElementById('hintListContainer');
+      container.innerHTML = "";
+      if (currentHints.length === 0) {
+        container.innerHTML = "<p class='muted'>No hints configured for this round yet.</p>";
+        return;
       }
+      currentHints.sort((a,b) => a.tier - b.tier).forEach((h, idx) => {
+        const hCard = document.createElement('div');
+        hCard.className = 'hint-item-card';
+        hCard.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: var(--gold);">HINT TIER ${h.tier}</strong>
+            <button onclick="removeHint(${idx})" class="btn-danger" style="width: auto; padding: 2px 8px; font-size: 11px;">DELETE</button>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <input type="number" value="${h.tier}" onchange="currentHints[${idx}].tier = parseInt(this.value)||1" placeholder="Tier #" style="width: 90px;">
+            <input type="number" value="${h.point_cost}" onchange="currentHints[${idx}].point_cost = parseInt(this.value)||0" placeholder="Point Cost">
+          </div>
+          <textarea onchange="currentHints[${idx}].text = this.value" style="height: 55px; font-size: 13px; margin-top: 6px;" placeholder="Hint text shown to teams">${h.text}</textarea>
+        `;
+        container.appendChild(hCard);
+      });
+    }
+
+    function addBlankHint() {
+      const nextTier = currentHints.length + 1;
+      currentHints.push({ tier: nextTier, point_cost: nextTier === 1 ? 0 : 5, text: "New hint text" });
+      renderHintEditor();
+    }
+
+    function removeHint(index) {
+      currentHints.splice(index, 1);
+      renderHintEditor();
     }
 
     async function saveQuestionBank() {
@@ -308,33 +374,28 @@
       const res = await fetch(`${api}/api/admin/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-admin-key": key },
-        body: JSON.stringify({ round_number: round, questions: currentQuestions })
+        body: JSON.stringify({ round_number: round, questions: currentQuestions, hints: currentHints })
       });
       const data = await res.json();
       if (res.ok) {
-        msg.innerHTML = `<span style="color:#00ffcc">&gt; SUCCESSFULLY SYNCED ${data.question_count} NODES TO DATABASE FOR ROUND ${round}.</span>`;
+        msg.innerHTML = `<span style="color:var(--accent)">&gt; SYNCED ${data.question_count} NODES + ${data.hint_count} HINT TIERS FOR ROUND ${round}.</span>`;
       } else {
-        msg.innerHTML = `<span style="color:#ff3366">&gt; ERROR: ${data.detail}</span>`;
+        msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`;
       }
     }
 
-    // --- CREDENTIAL GENERATION (bulk) ---
+    // --- CREDENTIAL GENERATION ---
     function renderTeamNameInputs() {
       const count = parseInt(document.getElementById('teamCountInput').value) || 0;
       const container = document.getElementById('teamNameInputsContainer');
       container.innerHTML = "";
-
       if (count < 1) return;
-
       for (let i = 0; i < count; i++) {
         const input = document.createElement('input');
-        input.type = "text";
-        input.id = `teamNameSlot${i}`;
-        input.placeholder = `TEAM ${i + 1} NAME`;
-        input.style.marginBottom = "6px";
+        input.type = "text"; input.id = `teamNameSlot${i}`;
+        input.placeholder = `TEAM ${i + 1} NAME`; input.style.marginBottom = "6px";
         container.appendChild(input);
       }
-
       document.getElementById('generateAllBtn').style.display = "block";
       document.getElementById('credGenMsg').innerHTML = "";
     }
@@ -344,131 +405,87 @@
       const key = document.getElementById('adminKey').value;
       const count = parseInt(document.getElementById('teamCountInput').value) || 0;
       const msg = document.getElementById('credGenMsg');
-
       const names = [];
       for (let i = 0; i < count; i++) {
         const el = document.getElementById(`teamNameSlot${i}`);
         if (el && el.value.trim()) names.push(el.value.trim());
       }
-
-      if (names.length === 0) {
-        msg.innerHTML = `<span style="color:#ff3366">&gt; ENTER AT LEAST ONE TEAM NAME.</span>`;
-        return;
-      }
-
-      msg.innerHTML = `<span style="color:#ffaa00">&gt; GENERATING ${names.length} TEAM(S)...</span>`;
-
+      if (names.length === 0) { msg.innerHTML = `<span style="color:var(--danger)">&gt; ENTER AT LEAST ONE TEAM NAME.</span>`; return; }
+      msg.innerHTML = `<span style="color:var(--gold)">&gt; GENERATING ${names.length} TEAM(S)...</span>`;
       try {
         const res = await fetch(`${api}/api/admin/create-teams-bulk`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-admin-key": key },
+          method: "POST", headers: { "Content-Type": "application/json", "x-admin-key": key },
           body: JSON.stringify({ team_names: names })
         });
         const data = await res.json();
         if (res.ok) {
-          msg.innerHTML = `<span style="color:#00ffcc">&gt; CREATED ${data.created_count} TEAM(S). CREDENTIALS SAVED TO DB — SEE TABLE BELOW.</span>`;
+          msg.innerHTML = `<span style="color:var(--accent)">&gt; CREATED ${data.created_count} TEAM(S). SEE TABLE BELOW.</span>`;
           document.getElementById('teamNameInputsContainer').innerHTML = "";
           document.getElementById('generateAllBtn').style.display = "none";
           document.getElementById('teamCountInput').value = "10";
-          loadAllTeams();
-          refreshLeaderboard();
-        } else {
-          msg.innerHTML = `<span style="color:#ff3366">&gt; ERROR: ${data.detail}</span>`;
-        }
-      } catch (err) {
-        msg.innerHTML = `<span style="color:#ff3366">&gt; REQUEST FAILED: ${err}</span>`;
-      }
+          loadAllTeams(); refreshLeaderboard();
+        } else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
+      } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
     }
 
-    // --- PERSISTENT ALL-TEAMS CREDENTIAL TABLE ---
     let allTeamsCache = [];
 
     function renderTeamsTable(teams) {
       const tbody = document.getElementById('allTeamsBody');
-      if (teams.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5">No matching teams.</td></tr>`;
-        return;
-      }
+      if (teams.length === 0) { tbody.innerHTML = `<tr><td colspan="5">No matching teams.</td></tr>`; return; }
       tbody.innerHTML = teams.map(t => `
         <tr class="${t.status === 'ELIMINATED' ? 'elim-row' : ''}">
-          <td>${t.team_id}</td>
-          <td>${t.team_name}</td>
-          <td style="color:#ffff00">${t.password}</td>
+          <td>${t.team_id}</td><td>${t.team_name}</td><td style="color:var(--gold)">${t.password}</td>
           <td>${t.current_round}</td>
           <td><span class="badge ${t.status === 'QUALIFIED' ? 'badge-qual' : 'badge-elim'}">${t.status}</span></td>
-        </tr>
-      `).join('');
+        </tr>`).join('');
     }
 
     function filterTeamsTable() {
       const query = document.getElementById('teamSearchInput').value.trim().toUpperCase();
-      if (!query) {
-        renderTeamsTable(allTeamsCache);
-        return;
-      }
-      const filtered = allTeamsCache.filter(t =>
-        t.team_id.toUpperCase().includes(query) || t.team_name.toUpperCase().includes(query)
-      );
-      renderTeamsTable(filtered);
+      if (!query) { renderTeamsTable(allTeamsCache); return; }
+      renderTeamsTable(allTeamsCache.filter(t => t.team_id.toUpperCase().includes(query) || t.team_name.toUpperCase().includes(query)));
     }
 
     async function loadAllTeams() {
       const api = document.getElementById('apiBase').value;
       const key = document.getElementById('adminKey').value;
       const tbody = document.getElementById('allTeamsBody');
-
       try {
-        const res = await fetch(`${api}/api/admin/teams`, {
-          headers: { "x-admin-key": key }
-        });
+        const res = await fetch(`${api}/api/admin/teams`, { headers: { "x-admin-key": key } });
         const data = await res.json();
-        if (!res.ok) {
-          tbody.innerHTML = `<tr><td colspan="5" style="color:#ff3366">ERROR: ${data.detail || 'Failed to load teams.'}</td></tr>`;
-          return;
-        }
-
+        if (!res.ok) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">ERROR: ${data.detail || 'Failed to load teams.'}</td></tr>`; return; }
         allTeamsCache = data.teams;
         filterTeamsTable();
-      } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" style="color:#ff3366">REQUEST FAILED: ${err}</td></tr>`;
-      }
+      } catch (err) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">REQUEST FAILED: ${err}</td></tr>`; }
     }
 
-    // --- LEADERBOARD & PROMOTION ---
     async function refreshLeaderboard() {
       const api = document.getElementById('apiBase').value;
       const key = document.getElementById('adminKey').value;
       const round = document.getElementById('boardRoundSelect').value;
       document.getElementById('viewingRoundNum').innerText = round;
 
-      const res = await fetch(`${api}/api/admin/leaderboard/${round}`, {
-        headers: { "x-admin-key": key }
-      });
+      const res = await fetch(`${api}/api/admin/leaderboard/${round}`, { headers: { "x-admin-key": key } });
       const data = await res.json();
       if (!res.ok) return;
 
       document.getElementById('liveTelemetry').innerHTML = `
-        Registered: <strong>${data.total_registered}</strong> | Received: <strong>${data.total_submitted}</strong> | 
-        Status: ${data.all_teams_submitted ? '<span style="color:#00ffcc">[ALL NODES SYNCED]</span>' : '<span style="color:#ffaa00">[ROUND RUNNING]</span>'}
-      `;
+        Registered: <strong>${data.total_registered}</strong> | Received: <strong>${data.total_submitted}</strong> |
+        Status: ${data.all_teams_submitted ? '<span style="color:var(--accent)">[ALL NODES SYNCED]</span>' : '<span style="color:var(--gold)">[ROUND RUNNING]</span>'}`;
 
       const tbody = document.getElementById('boardBody');
-      if (data.leaderboard.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7">No logs received for Round ${round}.</td></tr>`;
-        return;
-      }
+      if (data.leaderboard.length === 0) { tbody.innerHTML = `<tr><td colspan="8">No logs received for Round ${round}.</td></tr>`; return; }
 
       tbody.innerHTML = data.leaderboard.map(r => `
         <tr class="${r.status === 'ELIMINATED' ? 'elim-row' : ''}">
           <td class="${r.rank === 1 ? 'rank-1' : ''}">#${r.rank}</td>
-          <td>${r.team_id}</td>
-          <td>${r.team_name}</td>
+          <td>${r.team_id}</td><td>${r.team_name}</td>
           <td><strong>${r.score} pts</strong></td>
-          <td>${r.time_taken_seconds}s</td>
-          <td>${r.tab_switch_count}</td>
+          <td>${(r.hints_used || []).length ? r.hints_used.join(', ') : '—'}</td>
+          <td>${r.time_taken_seconds}s</td><td>${r.tab_switch_count}</td>
           <td><span class="badge ${r.status === 'QUALIFIED' ? 'badge-qual' : 'badge-elim'}">${r.status}</span></td>
-        </tr>
-      `).join('');
+        </tr>`).join('');
     }
 
     async function executePromotion() {
@@ -476,30 +493,28 @@
       const key = document.getElementById('adminKey').value;
       const topN = parseInt(document.getElementById('promoteTopN').value);
       const nextR = parseInt(document.getElementById('promoteTargetRound').value);
-
       if (!confirm(`Confirm promotion of Top ${topN} teams to Round ${nextR}? Remaining teams will be marked ELIMINATED.`)) return;
 
       const res = await fetch(`${api}/api/admin/promote-teams`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-key": key },
+        method: "POST", headers: { "Content-Type": "application/json", "x-admin-key": key },
         body: JSON.stringify({ top_n_teams: topN, next_round: nextR })
       });
       const data = await res.json();
       if (res.ok) {
-        document.getElementById('promoResult').innerHTML = `<span style="color:#00ffcc">&gt; PROMOTED: ${data.promoted_count} | ELIMINATED: ${data.eliminated_count}</span>`;
-        refreshLeaderboard();
+        document.getElementById('promoResult').innerHTML = `<span style="color:var(--accent)">&gt; PROMOTED: ${data.promoted_count} | ELIMINATED: ${data.eliminated_count}</span>`;
+        refreshLeaderboard(); refreshGateStatus();
       }
     }
 
-    // Load previously entered admin key from this browser only (never shipped in HTML)
     const savedKey = localStorage.getItem('nexusAdminKey');
     if (savedKey) document.getElementById('adminKey').value = savedKey;
 
-    // Auto-refresh & init
     loadQuestionsForEditing();
     refreshLeaderboard();
     loadAllTeams();
+    refreshGateStatus();
     setInterval(refreshLeaderboard, 4000);
+    setInterval(refreshGateStatus, 5000);
   </script>
 </body>
 </html>

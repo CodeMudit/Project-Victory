@@ -4,163 +4,232 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PROJECT NEXUS // ASSESSMENT NODE</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=VT323&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=VT323&display=swap" rel="stylesheet">
   <style>
-    /* ANTI-CHEAT HARDENING */
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
       user-select: none;
       -webkit-user-select: none;
-      -moz-user-select: none;
+    }
+
+    :root {
+      --accent: #00ff8c;
+      --accent-dim: #00ff8c55;
+      --gold: #ffcc33;
+      --danger: #ff3f5e;
+      --bg: #050b09;
+      --panel: rgba(4, 20, 13, 0.92);
     }
 
     body {
-      background-color: #030806;
-      color: #00ff66;
+      background:
+        radial-gradient(ellipse at top, #0a1a12 0%, var(--bg) 60%);
+      color: var(--accent);
       font-family: 'VT323', monospace;
-      font-size: 23px;
+      font-size: 22px;
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 20px;
-      text-shadow: 0 0 7px rgba(0, 255, 102, 0.5);
       overflow-x: hidden;
     }
 
-    /* Scanlines & Vignette */
     .crt-overlay {
-      position: fixed;
-      top: 0; left: 0; width: 100vw; height: 100vh;
+      position: fixed; inset: 0;
       pointer-events: none;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%);
+      background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.35) 50%);
       background-size: 100% 4px;
       z-index: 100;
     }
-
     .crt-vignette {
-      position: fixed;
-      top: 0; left: 0; width: 100vw; height: 100vh;
+      position: fixed; inset: 0;
       pointer-events: none;
-      box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+      box-shadow: inset 0 0 130px rgba(0,0,0,0.85);
       z-index: 101;
     }
 
     .terminal-card {
       width: 100%;
-      max-width: 860px;
-      background: rgba(2, 18, 8, 0.95);
-      border: 2px solid #00ff66;
-      box-shadow: 0 0 30px rgba(0, 255, 102, 0.25);
-      border-radius: 6px;
-      padding: 30px;
+      max-width: 880px;
+      background: var(--panel);
+      border: 1px solid var(--accent-dim);
+      box-shadow: 0 0 0 1px rgba(0,255,140,0.08), 0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(0,255,140,0.08);
+      border-radius: 14px;
+      padding: 32px;
       position: relative;
       z-index: 5;
+      backdrop-filter: blur(6px);
+      animation: fadeIn 0.3s ease;
     }
 
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0% { opacity: 1; } 100% { opacity: 0.35; } }
+
     .header-bar {
-      border-bottom: 1px dashed #00ff66;
-      padding-bottom: 12px;
-      margin-bottom: 20px;
+      border-bottom: 1px solid var(--accent-dim);
+      padding-bottom: 14px;
+      margin-bottom: 22px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-family: 'Orbitron', sans-serif;
-      font-size: 17px;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(0,255,140,0.1);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 22px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #00cfff);
+      transition: width 0.35s ease;
+      border-radius: 4px;
     }
 
     .timer-badge {
-      color: #ffff00;
-      font-size: 26px;
-      font-family: 'VT323', monospace;
+      color: var(--gold);
+      font-size: 28px;
+      text-shadow: 0 0 10px rgba(255,204,51,0.5);
     }
+    .timer-warning { color: var(--danger) !important; animation: pulse 0.7s infinite alternate; }
 
-    .timer-warning {
-      color: #ff3333 !important;
-      animation: pulse 0.7s infinite alternate;
-    }
-
-    @keyframes pulse {
-      0% { opacity: 1; }
-      100% { opacity: 0.3; }
-    }
-
-    .options-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 20px;
-    }
+    .options-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 22px; }
 
     .opt-btn {
-      background: rgba(0, 35, 10, 0.7);
-      border: 1px solid #00ff66;
-      color: #00ff66;
+      background: rgba(0,255,140,0.05);
+      border: 1px solid var(--accent-dim);
+      color: var(--accent);
       font-family: 'VT323', monospace;
-      font-size: 23px;
-      padding: 12px 18px;
+      font-size: 22px;
+      padding: 14px 18px;
       text-align: left;
       cursor: pointer;
-      border-radius: 4px;
+      border-radius: 8px;
       transition: all 0.15s ease;
     }
-
-    .opt-btn:hover {
-      background: #00ff66;
-      color: #030806;
-      text-shadow: none;
-    }
+    .opt-btn:hover { background: var(--accent); color: #041008; border-color: var(--accent); transform: translateX(3px); }
 
     input[type="text"], input[type="password"] {
-      background: rgba(0, 20, 5, 0.8);
-      border: 1px solid #00ff66;
+      background: rgba(0,255,140,0.05);
+      border: 1px solid var(--accent-dim);
       outline: none;
-      color: #00ff66;
+      color: var(--accent);
       font-family: 'VT323', monospace;
-      font-size: 24px;
-      padding: 10px 15px;
+      font-size: 23px;
+      padding: 12px 16px;
       width: 100%;
       text-transform: uppercase;
       margin: 10px 0;
+      border-radius: 8px;
     }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,255,140,0.12); }
 
     .action-btn {
-      background: #00ff66;
-      color: #030806;
+      background: var(--accent);
+      color: #041008;
       border: none;
       font-family: 'VT323', monospace;
-      font-size: 24px;
-      padding: 10px 24px;
+      font-size: 22px;
+      padding: 13px 24px;
       cursor: pointer;
       font-weight: bold;
       width: 100%;
       margin-top: 10px;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
     }
-
-    .action-btn:hover { background: #33ff88; }
+    .action-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,255,140,0.25); }
+    .action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
     .hidden { display: none !important; }
-    .warning-text { color: #ff3333; margin-top: 10px; font-size: 19px; }
+    .warning-text { color: var(--danger); margin-top: 10px; font-size: 18px; }
+    .info-text { color: #7fffb0; margin-top: 10px; font-size: 18px; }
+    .muted-text { color: #6fae86; font-size: 16px; margin-top: 6px; }
 
-    /* Strike Modal */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(0, 0, 0, 0.92);
-      display: flex; justify-content: center; align-items: center;
-      z-index: 200; padding: 20px;
+    .pulse-dot {
+      display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+      background: var(--gold); margin-right: 8px; animation: pulse 0.9s infinite alternate;
     }
 
-    .modal-box {
-      background: rgba(30, 0, 0, 0.98);
-      border: 3px solid #ff3333;
-      box-shadow: 0 0 40px rgba(255, 51, 51, 0.8);
+    .instructions-box {
+      background: rgba(0,255,140,0.04);
+      border: 1px dashed var(--accent-dim);
+      border-radius: 10px;
+      padding: 18px;
+      margin: 16px 0;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .badge-pill {
+      display: inline-block; border: 1px solid var(--accent-dim);
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-family: 'Orbitron', sans-serif;
+    }
+
+    /* HINT LADDER PANEL */
+    .hint-panel {
+      margin-top: 24px;
+      border-top: 1px dashed var(--accent-dim);
+      padding-top: 16px;
+    }
+    .hint-panel-title {
+      font-family: 'Orbitron', sans-serif; font-size: 13px; color: var(--gold);
+      letter-spacing: 1px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .hint-tier-row { display: flex; gap: 10px; margin-bottom: 8px; }
+    .hint-tier-btn {
+      flex: 1;
+      background: rgba(255,204,51,0.06);
+      border: 1px solid #ffcc3355;
+      color: var(--gold);
+      font-family: 'VT323', monospace;
+      font-size: 17px;
+      padding: 9px 12px;
+      cursor: pointer;
       border-radius: 6px;
-      padding: 30px;
-      max-width: 600px;
-      text-align: center;
-      color: #ff3333;
+      text-align: left;
+    }
+    .hint-tier-btn:hover:not(:disabled) { background: var(--gold); color: #221800; }
+    .hint-tier-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .hint-tier-btn.unlocked { border-color: var(--gold); background: rgba(255,204,51,0.12); }
+    .hint-text-box {
+      background: rgba(255,204,51,0.08);
+      border-left: 3px solid var(--gold);
+      padding: 10px 14px;
+      margin-top: 6px;
+      font-size: 18px;
+      color: #ffe9a8;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+      display: flex; justify-content: center; align-items: center; z-index: 200; padding: 20px;
+    }
+    .modal-box {
+      background: rgba(30,0,5,0.98); border: 2px solid var(--danger);
+      box-shadow: 0 0 40px rgba(255,63,94,0.6); border-radius: 12px;
+      padding: 32px; max-width: 600px; text-align: center; color: var(--danger);
+    }
+    .modal-box.success {
+      border-color: var(--accent); box-shadow: 0 0 40px rgba(0,255,140,0.6); color: var(--accent);
+    }
+
+    @media (max-width: 600px) {
+      body { font-size: 19px; }
+      .terminal-card { padding: 20px; border-radius: 10px; }
+      .timer-badge { font-size: 22px; }
     }
   </style>
 </head>
@@ -170,14 +239,33 @@
 
   <!-- SCREEN 1: SECURE AUTH GATEWAY -->
   <div class="terminal-card" id="loginScreen">
-    <div class="header-bar">
-      <div>PROJECT NEXUS // SYSTEM GATEWAY</div>
-    </div>
+    <div class="header-bar"><div>PROJECT NEXUS // SYSTEM GATEWAY</div></div>
     <p>&gt; ENTER AUTHORIZED CREDENTIALS DISPATCHED BY FACILITATORS.</p>
     <input type="text" id="loginTeamId" placeholder="TEAM ID (E.G. NEX-4920)" autocomplete="off">
     <input type="password" id="loginPass" placeholder="ACCESS KEY / PASSWORD" autocomplete="off">
-    <button class="action-btn" id="loginBtn">AUTHENTICATE & COMMENCE</button>
+    <button class="action-btn" id="loginBtn">AUTHENTICATE & CONTINUE</button>
     <div id="loginMsg" class="warning-text"></div>
+  </div>
+
+  <!-- SCREEN 1B: WAITING FOR ADMIN TO OPEN THE ROUND -->
+  <div class="terminal-card hidden" id="waitingRoundScreen">
+    <div class="header-bar"><div>PROJECT NEXUS // HOLDING PATTERN</div></div>
+    <p><span class="pulse-dot"></span>STANDING BY: ROUND <span id="waitingRoundNum">-</span> HAS NOT BEEN OPENED BY THE ADMIN YET.</p>
+    <p class="muted-text">This screen advances automatically the instant the round is unlocked. Do not refresh — credentials are already verified and your place is held.</p>
+  </div>
+
+  <!-- SCREEN 1C: PRE-ROUND START SCREEN -->
+  <div class="terminal-card hidden" id="startScreen">
+    <div class="header-bar">
+      <div>PROJECT NEXUS // ROUND <span id="startRoundNum">-</span> BRIEFING</div>
+      <div class="badge-pill" id="startTeamBadge">TEAM: ---</div>
+    </div>
+    <div class="instructions-box">
+      &gt; <span id="startInstructions">Answer each question before the per-question timer expires. Switching tabs is monitored and penalized. Hints are available for a point cost. Once you click START, the attempt cannot be restarted.</span>
+    </div>
+    <p class="muted-text" id="resumeNotice"></p>
+    <p class="muted-text">Mission clock (elapsed since round opened): <span id="missionClock">00:00</span></p>
+    <button class="action-btn" id="startRoundBtn">START ROUND</button>
   </div>
 
   <!-- SCREEN 2: ACTIVE ASSESSMENT TERMINAL -->
@@ -187,127 +275,202 @@
       <div id="progressDisplay">NODE 1/--</div>
       <div class="timer-badge" id="timer">45s</div>
     </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
 
-    <div id="questionText" style="font-size: 25px; min-height: 55px; line-height: 1.3;"></div>
-    
+    <div id="questionText" style="font-size: 24px; min-height: 55px; line-height: 1.3;"></div>
+
     <div class="options-grid" id="optionsContainer"></div>
 
     <div id="textInputContainer" class="hidden">
       <input type="text" id="blankInput" placeholder="TYPE ANSWER & PRESS ENTER">
       <button class="action-btn" id="submitTextBtn">CONFIRM ANSWER</button>
     </div>
+
+    <div class="hint-panel hidden" id="hintPanel">
+      <div class="hint-panel-title">⚠ HINT TERMINAL — using a hint deducts points from this round's score</div>
+      <div id="hintTierButtons"></div>
+      <div id="hintTextArea"></div>
+    </div>
   </div>
 
   <!-- SCREEN 3: RESULT & REAL-TIME BROADCAST -->
   <div class="terminal-card hidden" id="endScreen">
-    <div class="header-bar">
-      <div>TRANSMISSION SUMMARY // PROJECT NEXUS</div>
-    </div>
+    <div class="header-bar"><div>TRANSMISSION SUMMARY // PROJECT NEXUS</div></div>
     <p id="endStatus">&gt; LOGS SYNCED TO CENTRAL REPOSITORY.</p>
-    <p id="subReason" style="margin-top: 10px; color: #ffff00;"></p>
-    
-    <div id="eliminationStatusArea" style="margin-top: 25px; border-top: 1px dashed #00ff66; padding-top: 15px;">
-      <p id="waitingMsg">&gt; STANDING BY: POLLING CENTRAL NETWORK FOR UNIVERSAL ROUND COMPLETION...</p>
+    <p id="subReason" style="margin-top: 10px; color: var(--gold);"></p>
+
+    <div id="eliminationStatusArea" style="margin-top: 25px; border-top: 1px dashed var(--accent-dim); padding-top: 15px;">
+      <p id="waitingMsg"><span class="pulse-dot"></span>STANDING BY: POLLING CENTRAL NETWORK FOR UNIVERSAL ROUND COMPLETION...</p>
     </div>
   </div>
 
-  <!-- WARNING MODAL (ROUND 1 STRIKE 1) -->
+  <!-- WARNING MODAL -->
   <div id="warningModal" class="modal-overlay hidden">
     <div class="modal-box">
-      <h2 style="font-family:'Orbitron'; font-size: 26px; margin-bottom: 12px;">[!] SECURITY BREACH WARNING</h2>
-      <p style="color: #fff; margin-bottom: 20px; font-size: 21px;">TAB SWITCH DETECTED (STRIKE 1/2).<br>A SECOND TAB SWITCH WILL FORCE-TERMINATE YOUR TEST IMMEDIATELY.</p>
-      <button class="action-btn" style="background:#ff3333; color:#000;" id="dismissWarningBtn">ACKNOWLEDGE & RESUME</button>
+      <h2 style="font-family:'Orbitron'; font-size: 24px; margin-bottom: 12px;">[!] SECURITY BREACH WARNING</h2>
+      <p style="color: #fff; margin-bottom: 20px; font-size: 20px;">TAB SWITCH DETECTED (STRIKE 1/2).<br>A SECOND TAB SWITCH WILL FORCE-TERMINATE YOUR TEST IMMEDIATELY.</p>
+      <button class="action-btn" style="background:var(--danger); color:#fff;" id="dismissWarningBtn">ACKNOWLEDGE & RESUME</button>
+    </div>
+  </div>
+
+  <!-- ROUND CLEARED MODAL -->
+  <div id="clearedModal" class="modal-overlay hidden">
+    <div class="modal-box success">
+      <h2 style="font-family:'Orbitron'; font-size: 24px; margin-bottom: 12px;">[✓] ROUND CLEARED</h2>
+      <p style="color: #fff; margin-bottom: 20px; font-size: 20px;" id="clearedMsg">Your team has advanced to the next round.</p>
+      <button class="action-btn" id="proceedNextRoundBtn">PROCEED TO NEXT ROUND</button>
     </div>
   </div>
 
   <script>
-    // Set your Railway backend domain or local endpoint
     const BACKEND_URL = "https://project-victory-production-d780.up.railway.app";
 
     let questions = [];
+    let roundHints = [];       // [{tier, point_cost}] — text arrives only on request
+    let hintsUsed = [];        // tiers unlocked so far, e.g. [1, 2]
     let currentQIdx = 0;
     let timerInterval = null;
-    let totalTimerInterval = null;
+    let missionClockInterval = null;
     let timeLeft = 45;
-    let totalSecondsElapsed = 0;
-    let teamId = "";
-    let teamPassword = "";
+    let teamId = "", teamPassword = "", teamName = "";
     let activeRound = 1;
-    const answers = {};
+    let roundOpenedAtMs = null;
+    let answers = {};
     let tabSwitchCount = 0;
+    let warnedAlready = false;
     let quizActive = false;
     let isSubmitting = false;
+    let roundWaitPoll = null;
+    let localElapsedSeconds = 0;
+    let totalTimerInterval = null;
 
-    // Login Handler
-    document.getElementById('loginBtn').addEventListener('click', async () => {
+    function showScreen(id) {
+      ['loginScreen', 'waitingRoundScreen', 'startScreen', 'quizScreen', 'endScreen'].forEach(s => {
+        document.getElementById(s).classList.toggle('hidden', s !== id);
+      });
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', () => {
       const idInput = document.getElementById('loginTeamId').value.trim().toUpperCase();
       const passInput = document.getElementById('loginPass').value.trim().toUpperCase();
       const msg = document.getElementById('loginMsg');
+      if (!idInput || !passInput) { msg.innerText = "[!] TEAM ID AND PASSWORD REQUIRED."; return; }
+      teamId = idInput; teamPassword = passInput;
+      attemptLogin();
+    });
 
-      if (!idInput || !passInput) {
-        msg.innerText = "[!] TEAM ID AND PASSWORD REQUIRED.";
-        return;
-      }
+    async function attemptLogin(isSilentRetry = false) {
+      const msg = document.getElementById('loginMsg');
+      if (!isSilentRetry) msg.innerText = "";
 
       try {
         const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ team_id: idInput, password: passInput })
+          body: JSON.stringify({ team_id: teamId, password: teamPassword })
         });
         const data = await res.json();
-        if (!res.ok) {
-          msg.innerText = `[!] ${data.detail || "Authentication Failed."}`;
+
+        if (res.status === 423) {
+          activeRound = extractRoundFromMessage(data.detail) || activeRound;
+          document.getElementById('waitingRoundNum').innerText = activeRound;
+          showScreen('waitingRoundScreen');
+          if (!roundWaitPoll) roundWaitPoll = setInterval(() => attemptLogin(true), 5000);
           return;
         }
 
-        teamId = data.team_id;
-        teamPassword = passInput;
-        activeRound = data.current_round;
+        if (!res.ok) {
+          if (roundWaitPoll) { clearInterval(roundWaitPoll); roundWaitPoll = null; }
+          if (!isSilentRetry) { msg.innerText = `[!] ${data.detail || "Authentication Failed."}`; showScreen('loginScreen'); }
+          return;
+        }
 
-        // Fetch questions dynamically from Database
+        if (roundWaitPoll) { clearInterval(roundWaitPoll); roundWaitPoll = null; }
+
+        teamId = data.team_id;
+        teamName = data.team_name;
+        activeRound = data.current_round;
+        roundOpenedAtMs = Date.parse(data.round_opened_at);
+
+        currentQIdx = data.resume.current_index || 0;
+        answers = data.resume.answers || {};
+        tabSwitchCount = data.resume.tab_switch_count || 0;
+        warnedAlready = data.resume.warned || false;
+        hintsUsed = data.resume.hints_used || [];
+
         const qRes = await fetch(`${BACKEND_URL}/api/questions/${activeRound}`);
         const qData = await qRes.json();
         questions = qData.questions || [];
+        roundHints = qData.hints || [];
 
         if (questions.length === 0) {
           msg.innerText = "[!] ERROR: NO QUESTIONS CONFIGURED FOR THIS ROUND BY ADMIN.";
+          showScreen('loginScreen');
           return;
         }
 
-        document.getElementById('teamDisplay').innerText = `TEAM: ${data.team_name} (${teamId})`;
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('quizScreen').classList.remove('hidden');
-        quizActive = true;
+        document.getElementById('teamDisplay').innerText = `TEAM: ${teamName} (${teamId})`;
+        document.getElementById('startTeamBadge').innerText = `TEAM: ${teamName}`;
+        document.getElementById('startRoundNum').innerText = activeRound;
 
-        totalTimerInterval = setInterval(() => totalSecondsElapsed++, 1000);
-        loadQuestion();
+        const resumeNotice = document.getElementById('resumeNotice');
+        resumeNotice.innerText = (data.resume.resumed && currentQIdx > 0)
+          ? `> SESSION RESTORED: Resuming from Node ${currentQIdx + 1}/${questions.length}. Prior strikes (${tabSwitchCount}) and hints used carried over.`
+          : "";
+
+        startMissionClock();
+        showScreen('startScreen');
       } catch (err) {
-        msg.innerText = "[!] BACKEND UNREACHABLE. CHECK SERVER.";
+        if (!isSilentRetry) { msg.innerText = "[!] BACKEND UNREACHABLE. CHECK SERVER."; showScreen('loginScreen'); }
       }
+    }
+
+    function extractRoundFromMessage(detail) {
+      if (!detail) return null;
+      const m = detail.match(/Round (\d+)/);
+      return m ? parseInt(m[1]) : null;
+    }
+
+    function startMissionClock() {
+      clearInterval(missionClockInterval);
+      const el = document.getElementById('missionClock');
+      const tick = () => {
+        if (!roundOpenedAtMs) return;
+        const secs = Math.max(0, Math.floor((Date.now() - roundOpenedAtMs) / 1000));
+        el.innerText = `${Math.floor(secs/60).toString().padStart(2,'0')}:${(secs%60).toString().padStart(2,'0')}`;
+      };
+      tick();
+      missionClockInterval = setInterval(tick, 1000);
+    }
+
+    document.getElementById('startRoundBtn').addEventListener('click', () => {
+      clearInterval(missionClockInterval);
+      showScreen('quizScreen');
+      quizActive = true;
+      isSubmitting = false;
+      totalTimerInterval = setInterval(() => localElapsedSeconds++, 1000);
+      renderHintPanel();
+      loadQuestion();
     });
 
-    // Anti-Cheat Hardening
     document.addEventListener('copy', (e) => e.preventDefault());
     document.addEventListener('cut', (e) => e.preventDefault());
     document.addEventListener('paste', (e) => e.preventDefault());
 
-    // Strict Multi-Round Tab Switch Enforcement
     document.addEventListener('visibilitychange', () => {
       if (!quizActive || isSubmitting) return;
-
       if (document.hidden) {
         tabSwitchCount++;
+        saveProgress();
         if (activeRound === 1) {
-          if (tabSwitchCount >= 2) {
-            finishQuiz("TERMINATED_DUE_TO_TAB_SWITCHING");
-          }
+          if (tabSwitchCount >= 2) finishQuiz("TERMINATED_DUE_TO_TAB_SWITCHING");
         } else {
-          // Zero tolerance on advanced rounds
           finishQuiz("DISQUALIFIED");
         }
       } else {
         if (activeRound === 1 && tabSwitchCount === 1 && !isSubmitting) {
+          warnedAlready = true;
+          saveProgress();
           document.getElementById('warningModal').classList.remove('hidden');
         }
       }
@@ -318,10 +481,7 @@
     });
 
     function loadQuestion() {
-      if (currentQIdx >= questions.length) {
-        finishQuiz("NORMAL_COMPLETION");
-        return;
-      }
+      if (currentQIdx >= questions.length) { finishQuiz("NORMAL_COMPLETION"); return; }
 
       clearInterval(timerInterval);
       timeLeft = 45;
@@ -329,6 +489,7 @@
 
       const q = questions[currentQIdx];
       document.getElementById('progressDisplay').innerText = `NODE ${currentQIdx + 1}/${questions.length}`;
+      document.getElementById('progressFill').style.width = `${Math.round((currentQIdx / questions.length) * 100)}%`;
       document.getElementById('questionText').innerText = q.text;
 
       const optContainer = document.getElementById('optionsContainer');
@@ -339,7 +500,6 @@
         textContainer.classList.add('hidden');
         optContainer.classList.remove('hidden');
         optContainer.innerHTML = '';
-
         q.options.forEach(opt => {
           const btn = document.createElement('button');
           btn.className = 'opt-btn';
@@ -352,7 +512,6 @@
         textContainer.classList.remove('hidden');
         blankInput.value = '';
         blankInput.focus();
-
         const submitText = () => selectAnswer(q.id, blankInput.value.trim());
         document.getElementById('submitTextBtn').onclick = submitText;
         blankInput.onkeydown = (e) => { if (e.key === 'Enter') submitText(); };
@@ -361,25 +520,75 @@
       timerInterval = setInterval(() => {
         timeLeft--;
         updateTimerDisplay();
-        if (timeLeft <= 0) {
-          clearInterval(timerInterval);
-          selectAnswer(q.id, "TIMEOUT");
-        }
+        if (timeLeft <= 0) { clearInterval(timerInterval); selectAnswer(q.id, "TIMEOUT"); }
       }, 1000);
     }
 
     function updateTimerDisplay() {
       const timerEl = document.getElementById('timer');
       timerEl.innerText = `${timeLeft}s`;
-      if (timeLeft <= 10) timerEl.classList.add('timer-warning');
-      else timerEl.classList.remove('timer-warning');
+      timerEl.classList.toggle('timer-warning', timeLeft <= 10);
     }
 
     function selectAnswer(qId, val) {
       clearInterval(timerInterval);
       answers[qId] = val;
       currentQIdx++;
+      saveProgress();
       loadQuestion();
+    }
+
+    function saveProgress() {
+      fetch(`${BACKEND_URL}/api/session/progress`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          team_id: teamId, password: teamPassword, round_number: activeRound,
+          current_index: currentQIdx, answers: answers,
+          tab_switch_count: tabSwitchCount, warned: warnedAlready
+        })
+      }).catch(() => {});
+    }
+
+    // --- HINT LADDER (round-level: applies to the whole round, matches printed rubric) ---
+    function renderHintPanel() {
+      const panel = document.getElementById('hintPanel');
+      const btnWrap = document.getElementById('hintTierButtons');
+      btnWrap.innerHTML = '';
+
+      if (!roundHints || roundHints.length === 0) { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+
+      roundHints.forEach(h => {
+        const unlocked = hintsUsed.includes(h.tier);
+        const prevUnlocked = h.tier === 1 || hintsUsed.includes(h.tier - 1);
+        const btn = document.createElement('button');
+        btn.className = 'hint-tier-btn' + (unlocked ? ' unlocked' : '');
+        btn.disabled = !prevUnlocked && !unlocked;
+        const costLabel = h.point_cost === 0 ? 'FREE' : `-${h.point_cost} PTS`;
+        btn.innerText = unlocked ? `✓ HINT ${h.tier} REVEALED (${costLabel})` : `REVEAL HINT ${h.tier} (${costLabel})`;
+        btn.onclick = () => requestHint(h.tier);
+        btnWrap.appendChild(btn);
+      });
+    }
+
+    async function requestHint(tier) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/hint/request`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team_id: teamId, password: teamPassword, round_number: activeRound, tier })
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+
+        if (!hintsUsed.includes(tier)) hintsUsed.push(tier);
+        const box = document.createElement('div');
+        box.className = 'hint-text-box';
+        box.innerText = `HINT ${data.tier}: ${data.text}`;
+        document.getElementById('hintTextArea').appendChild(box);
+        renderHintPanel();
+      } catch (err) { console.error(err); }
     }
 
     async function finishQuiz(statusReason = "NORMAL_COMPLETION") {
@@ -390,8 +599,7 @@
       clearInterval(totalTimerInterval);
 
       document.getElementById('warningModal').classList.add('hidden');
-      document.getElementById('quizScreen').classList.add('hidden');
-      document.getElementById('endScreen').classList.remove('hidden');
+      showScreen('endScreen');
 
       if (statusReason === "DISQUALIFIED") {
         document.getElementById('subReason').innerText = "> NOTICE: IMMEDIATE DISQUALIFICATION TRIGGERED (ROUND 2+ ZERO-TOLERANCE BREACH).";
@@ -404,22 +612,17 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            team_id: teamId,
-            password: teamPassword,
-            round_number: activeRound,
-            answers: answers,
-            tab_switch_count: tabSwitchCount,
-            time_taken_seconds: totalSecondsElapsed,
-            submission_status: statusReason
+            team_id: teamId, password: teamPassword, round_number: activeRound,
+            answers: answers, tab_switch_count: tabSwitchCount,
+            time_taken_seconds: localElapsedSeconds, submission_status: statusReason
           })
         });
         const data = await res.json();
         if (res.ok) {
-          document.getElementById('endStatus').innerText = `> SUCCESS: NODE DATA TRANSMITTED. SCORE: ${data.score} PTS.`;
+          const hintNote = data.hint_penalty > 0 ? ` (−${data.hint_penalty} PTS FOR HINTS USED)` : '';
+          document.getElementById('endStatus').innerText = `> SUCCESS: NODE DATA TRANSMITTED. SCORE: ${data.score} PTS${hintNote}.`;
         }
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
 
       startUniversalStatusPolling();
     }
@@ -429,31 +632,38 @@
         try {
           const res = await fetch(`${BACKEND_URL}/api/team/status/${teamId}`);
           const data = await res.json();
-          
+
           if (data.all_teams_finished) {
             clearInterval(pollInterval);
             const statusArea = document.getElementById('eliminationStatusArea');
             if (data.status === "ELIMINATED") {
               statusArea.innerHTML = `
-                <div style="background: rgba(45,0,0,0.85); border: 2px solid #ff3333; padding: 20px; text-align: center; color: #ff3333;">
-                  <h2 style="font-family:'Orbitron'; font-size: 26px;">[X] TOURNAMENT ELIMINATION NOTICE</h2>
-                  <p style="color: #fff; margin-top: 10px; font-size: 20px;">ALL TEAMS HAVE CONCLUDED THE CURRENT ROUND.<br>BASED ON FINAL SCORES AND TIE-BREAKER PARAMETERS, YOUR TEAM HAS NOT ADVANCED.</p>
-                </div>
-              `;
+                <div style="background: rgba(45,0,10,0.85); border: 2px solid var(--danger); border-radius: 10px; padding: 22px; text-align: center; color: var(--danger);">
+                  <h2 style="font-family:'Orbitron'; font-size: 24px;">[X] TOURNAMENT ELIMINATION NOTICE</h2>
+                  <p style="color: #fff; margin-top: 10px; font-size: 19px;">ALL TEAMS HAVE CONCLUDED THE CURRENT ROUND.<br>BASED ON FINAL SCORES AND TIE-BREAKER PARAMETERS, YOUR TEAM HAS NOT ADVANCED.</p>
+                </div>`;
             } else {
               statusArea.innerHTML = `
-                <div style="background: rgba(0,40,15,0.85); border: 2px solid #00ff66; padding: 20px; text-align: center; color: #00ff66;">
-                  <h2 style="font-family:'Orbitron'; font-size: 26px;">[✓] ADVANCEMENT CONFIRMED</h2>
-                  <p style="color: #fff; margin-top: 10px; font-size: 20px;">ALL TEAMS HAVE FINISHED. YOUR TEAM HAS BEEN PROMOTED TO ROUND ${data.current_round}.</p>
-                </div>
-              `;
+                <div style="background: rgba(0,40,20,0.85); border: 2px solid var(--accent); border-radius: 10px; padding: 22px; text-align: center; color: var(--accent);">
+                  <h2 style="font-family:'Orbitron'; font-size: 24px;">[✓] ADVANCEMENT CONFIRMED</h2>
+                  <p style="color: #fff; margin-top: 10px; font-size: 19px;">ALL TEAMS HAVE FINISHED. YOUR TEAM HAS BEEN PROMOTED TO ROUND ${data.current_round}.</p>
+                </div>`;
+              document.getElementById('clearedMsg').innerText = `Your team cleared this round and has been promoted to Round ${data.current_round}.`;
+              document.getElementById('clearedModal').classList.remove('hidden');
             }
           }
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) { console.error(e); }
       }, 4000);
     }
+
+    document.getElementById('proceedNextRoundBtn').addEventListener('click', () => {
+      document.getElementById('clearedModal').classList.add('hidden');
+      currentQIdx = 0; answers = {}; tabSwitchCount = 0; warnedAlready = false;
+      hintsUsed = []; questions = []; roundHints = []; isSubmitting = false;
+      document.getElementById('hintTextArea').innerHTML = '';
+      document.getElementById('loginMsg').innerText = "";
+      attemptLogin();
+    });
   </script>
 </body>
 </html>

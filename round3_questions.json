@@ -11,13 +11,15 @@
         { "k": "C", "t": "R. Sharma" },
         { "k": "D", "t": "M. Khan" }
       ],
-      "correct_answer": "B"
+      "correct_answer": "B",
+      "points": 40
     },
     {
       "id": "Q2",
       "type": "text",
       "text": "At what exact time did the Archive Vault breach occur? (Format: HH:MM AM)",
-      "correct_answer": "03:55 AM"
+      "correct_answer": "03:55 AM",
+      "points": 30
     },
     {
       "id": "Q3",
@@ -29,13 +31,32 @@
         { "k": "C", "t": "Tailgated behind another employee" },
         { "k": "D", "t": "Used a master key stolen from security" }
       ],
-      "correct_answer": "A"
+      "correct_answer": "A",
+      "points": 40
     },
     {
       "id": "Q4",
       "type": "text",
       "text": "Which internal console bay was compromised during the data extraction?",
-      "correct_answer": "BAY-09"
+      "correct_answer": "BAY-09",
+      "points": 40
+    }
+  ],
+  "hints": [
+    {
+      "tier": 1,
+      "point_cost": 0,
+      "text": "Start by checking everyone's alibi. Did anyone claim to be off-campus, but their badge swiped inside the building?"
+    },
+    {
+      "tier": 2,
+      "point_cost": 5,
+      "text": "The thief hid their face on CCTV, but their wrist gadget was visible. Match that gadget with the suspect dossiers."
+    },
+    {
+      "tier": 3,
+      "point_cost": 10,
+      "text": "For HOW they got in, check the lab equipment sign-out sheet. For WHERE, look at the Telemetry Ticket at the bottom of File 02."
     }
   ]
 }

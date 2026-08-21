@@ -36,6 +36,8 @@ db = client["nexus_event_db"]
 teams_col = db["teams"]
 submissions_col = db["submissions"]
 questions_col = db["round_questions"]
+round_state_col = db["round_state"]   # {round_number, is_open, opened_at}
+sessions_col = db["sessions"]         # {team_id, round_number, current_index, answers, tab_switch_count, warned, hints_used, status, started_at, last_updated_at}
 
 # --- STATIC FRONTEND FILE SERVING ---
 
@@ -59,10 +61,17 @@ class QuestionModel(BaseModel):
     text: str
     options: Optional[List[Dict[str, str]]] = None
     correct_answer: str
+    points: Optional[int] = None  # per-question point value; defaults to 4 if omitted
+
+class HintModel(BaseModel):
+    tier: int
+    point_cost: int
+    text: str
 
 class SaveRoundQuestionsRequest(BaseModel):
     round_number: int
     questions: List[QuestionModel]
+    hints: List[HintModel] = []
 
 class CreateTeamRequest(BaseModel):
     team_name: str
@@ -73,6 +82,21 @@ class CreateTeamsBulkRequest(BaseModel):
 class LoginRequest(BaseModel):
     team_id: str
     password: str
+
+class SessionProgressRequest(BaseModel):
+    team_id: str
+    password: str
+    round_number: int
+    current_index: int
+    answers: Dict[str, Any]
+    tab_switch_count: int
+    warned: bool = False
+
+class HintRequestModel(BaseModel):
+    team_id: str
+    password: str
+    round_number: int
+    tier: int
 
 class SubmitQuizRequest(BaseModel):
     team_id: str
@@ -94,36 +118,61 @@ def generate_random_password(length=6):
 def normalize_text(text: str) -> str:
     return "".join(text.lower().split())
 
-# --- ADMIN QUESTION MANAGER ---
+def serialize_round_state(doc):
+    if not doc:
+        return {"is_open": False, "opened_at": None}
+    opened_at = doc.get("opened_at")
+    return {
+        "is_open": doc.get("is_open", False),
+        "opened_at": opened_at.isoformat() if opened_at else None
+    }
+
+async def authenticate_team(team_id: str, password: str):
+    team = await teams_col.find_one({
+        "team_id": team_id.strip().upper(),
+        "password": password.strip().upper()
+    })
+    if not team:
+        raise HTTPException(status_code=401, detail="Authentication failed.")
+    return team
+
+# --- ADMIN QUESTION & HINT MANAGER ---
 
 @app.post("/api/admin/questions")
 async def admin_save_questions(payload: SaveRoundQuestionsRequest, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-    
+
     doc = {
         "round_number": payload.round_number,
         "questions": [q.dict() for q in payload.questions],
+        "hints": [h.dict() for h in payload.hints],
         "updated_at": datetime.now(timezone.utc)
     }
-    
+
     await questions_col.update_one(
         {"round_number": payload.round_number},
         {"$set": doc},
         upsert=True
     )
-    return {"status": "success", "round": payload.round_number, "question_count": len(payload.questions)}
+    return {
+        "status": "success",
+        "round": payload.round_number,
+        "question_count": len(payload.questions),
+        "hint_count": len(payload.hints)
+    }
 
 @app.get("/api/admin/questions/{round_number}")
 async def admin_get_questions(round_number: int, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-    
+
     doc = await questions_col.find_one({"round_number": round_number})
     if not doc:
-        return {"round_number": round_number, "questions": []}
-    
+        return {"round_number": round_number, "questions": [], "hints": []}
+
     doc.pop("_id", None)
+    doc.setdefault("hints", [])
     return doc
 
 # --- PARTICIPANT QUESTION FETCHER ---
@@ -132,8 +181,8 @@ async def admin_get_questions(round_number: int, x_admin_key: str = Header(None)
 async def get_questions_for_round(round_number: int):
     doc = await questions_col.find_one({"round_number": round_number})
     if not doc:
-        return {"questions": []}
-    
+        return {"questions": [], "hints": []}
+
     safe_questions = []
     for q in doc.get("questions", []):
         safe_questions.append({
@@ -142,7 +191,54 @@ async def get_questions_for_round(round_number: int):
             "text": q["text"],
             "options": q.get("options", [])
         })
-    return {"round_number": round_number, "questions": safe_questions}
+
+    # Hint TEXT is never shipped up front — only tier + cost, so teams can see the
+    # ladder exists without reading the answer for free in devtools. Text is fetched
+    # only through /api/hint/request, which records the point cost against the team.
+    safe_hints = [
+        {"tier": h["tier"], "point_cost": h["point_cost"]}
+        for h in sorted(doc.get("hints", []), key=lambda h: h["tier"])
+    ]
+    return {"round_number": round_number, "questions": safe_questions, "hints": safe_hints}
+
+# --- ADMIN ROUND GATING ---
+# The web app timer for ranking purposes is anchored to opened_at (server clock),
+# not to any per-team client timestamp. This is what "the timer starts when the
+# admin enables the round" means in practice.
+
+@app.get("/api/round/{round_number}/status")
+async def get_round_status(round_number: int):
+    doc = await round_state_col.find_one({"round_number": round_number})
+    return {"round_number": round_number, **serialize_round_state(doc)}
+
+@app.post("/api/admin/round/{round_number}/open")
+async def admin_open_round(round_number: int, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+
+    existing = await round_state_col.find_one({"round_number": round_number})
+    if existing and existing.get("is_open"):
+        return {"status": "success", "round_number": round_number, **serialize_round_state(existing)}
+
+    opened_at = datetime.now(timezone.utc)
+    await round_state_col.update_one(
+        {"round_number": round_number},
+        {"$set": {"round_number": round_number, "is_open": True, "opened_at": opened_at}},
+        upsert=True
+    )
+    return {"status": "success", "round_number": round_number, "is_open": True, "opened_at": opened_at.isoformat()}
+
+@app.post("/api/admin/round/{round_number}/close")
+async def admin_close_round(round_number: int, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+
+    await round_state_col.update_one(
+        {"round_number": round_number},
+        {"$set": {"round_number": round_number, "is_open": False}},
+        upsert=True
+    )
+    return {"status": "success", "round_number": round_number, "is_open": False}
 
 # --- ADMIN TOURNAMENT CONTROLS ---
 
@@ -150,7 +246,7 @@ async def get_questions_for_round(round_number: int):
 async def admin_create_team(payload: CreateTeamRequest, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-    
+
     t_name = payload.team_name.strip()
     if not t_name:
         raise HTTPException(status_code=400, detail="Team name cannot be blank.")
@@ -179,7 +275,6 @@ async def admin_create_teams_bulk(payload: CreateTeamsBulkRequest, x_admin_key: 
     if not names:
         raise HTTPException(status_code=400, detail="No valid team names provided.")
 
-    # Avoid team_id collisions within this batch (extremely unlikely but cheap to guard)
     existing_ids = set()
     cursor = teams_col.find({}, {"team_id": 1})
     async for doc in cursor:
@@ -250,6 +345,8 @@ async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(Non
             "score": sub["score"],
             "time_taken_seconds": sub.get("time_taken_seconds", 0),
             "tab_switch_count": sub.get("tab_switch_count", 0),
+            "hint_penalty": sub.get("hint_penalty", 0),
+            "hints_used": sub.get("hints_used", []),
             "submission_status": sub.get("submission_status", "NORMAL_COMPLETION"),
             "status": team_info.get("status", "QUALIFIED") if team_info else "UNKNOWN",
             "current_round": team_info.get("current_round", 1) if team_info else 1,
@@ -301,6 +398,13 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
             )
             eliminated_count += 1
 
+    # New round starts locked until the admin explicitly opens it from the dashboard.
+    await round_state_col.update_one(
+        {"round_number": payload.next_round},
+        {"$set": {"round_number": payload.next_round, "is_open": False}},
+        upsert=True
+    )
+
     return {
         "status": "success",
         "promoted_count": promoted_count,
@@ -316,17 +420,13 @@ async def participant_login(payload: LoginRequest):
         "team_id": payload.team_id.strip().upper(),
         "password": payload.password.strip().upper()
     })
-    
+
     if not team:
         raise HTTPException(status_code=401, detail="Invalid Team ID or Access Password.")
 
     if team.get("status") == "ELIMINATED":
         raise HTTPException(status_code=403, detail="Notice: Your team has been eliminated.")
 
-    # Always authenticate for the round the team is actually qualified for right now,
-    # per their own DB record — never trust a round number the client sends. This is
-    # what prevents a team that already cleared Round 1 from getting stuck trying to
-    # re-enter Round 1 (which would incorrectly look like "already submitted").
     current_round = team.get("current_round", 1)
 
     existing_sub = await submissions_col.find_one({
@@ -336,11 +436,45 @@ async def participant_login(payload: LoginRequest):
     if existing_sub:
         raise HTTPException(status_code=400, detail=f"Already submitted Round {current_round}. Please wait for the next round to be unlocked by the admin.")
 
+    round_doc = await round_state_col.find_one({"round_number": current_round})
+    if not round_doc or not round_doc.get("is_open"):
+        raise HTTPException(status_code=423, detail=f"Round {current_round} has not been started by the admin yet. Please wait.")
+
+    session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": current_round})
+    if session and session.get("status") == "ACTIVE":
+        resume = {
+            "current_index": session.get("current_index", 0),
+            "answers": session.get("answers", {}),
+            "tab_switch_count": session.get("tab_switch_count", 0),
+            "warned": session.get("warned", False),
+            "hints_used": session.get("hints_used", []),
+            "resumed": True
+        }
+    else:
+        await sessions_col.update_one(
+            {"team_id": team["team_id"], "round_number": current_round},
+            {"$set": {
+                "team_id": team["team_id"],
+                "round_number": current_round,
+                "current_index": 0,
+                "answers": {},
+                "tab_switch_count": 0,
+                "warned": False,
+                "hints_used": [],
+                "status": "ACTIVE",
+                "started_at": datetime.now(timezone.utc)
+            }},
+            upsert=True
+        )
+        resume = {"current_index": 0, "answers": {}, "tab_switch_count": 0, "warned": False, "hints_used": [], "resumed": False}
+
     return {
         "status": "success",
         "team_id": team["team_id"],
         "team_name": team["team_name"],
-        "current_round": current_round
+        "current_round": current_round,
+        "round_opened_at": round_doc["opened_at"].isoformat(),
+        "resume": resume
     }
 
 @app.get("/api/team/status/{team_id}")
@@ -348,26 +482,105 @@ async def check_team_status(team_id: str):
     team = await teams_col.find_one({"team_id": team_id.strip().upper()})
     if not team:
         raise HTTPException(status_code=404, detail="Team not found.")
-    
+
     total_teams = await teams_col.count_documents({})
     round_submissions = await submissions_col.count_documents({"round_number": team.get("current_round", 1)})
     all_finished = (round_submissions >= total_teams) and (total_teams > 0)
+
+    round_doc = await round_state_col.find_one({"round_number": team.get("current_round", 1)})
 
     return {
         "team_id": team["team_id"],
         "status": team.get("status", "QUALIFIED"),
         "current_round": team.get("current_round", 1),
-        "all_teams_finished": all_finished
+        "all_teams_finished": all_finished,
+        "round_open": bool(round_doc and round_doc.get("is_open"))
+    }
+
+@app.post("/api/session/progress")
+async def save_session_progress(payload: SessionProgressRequest):
+    team = await authenticate_team(payload.team_id, payload.password)
+
+    existing_sub = await submissions_col.find_one({
+        "team_id": team["team_id"],
+        "round_number": payload.round_number
+    })
+    if existing_sub:
+        return {"status": "ignored", "reason": "already_submitted"}
+
+    await sessions_col.update_one(
+        {"team_id": team["team_id"], "round_number": payload.round_number},
+        {"$set": {
+            "current_index": payload.current_index,
+            "answers": payload.answers,
+            "tab_switch_count": payload.tab_switch_count,
+            "warned": payload.warned,
+            "last_updated_at": datetime.now(timezone.utc)
+        }},
+        upsert=True
+    )
+    return {"status": "success"}
+
+# --- GRADED HINT LADDER (Round 2 / Round 3) ---
+# Hints unlock in order (tier 1, then 2, then 3) and each tier's point_cost is
+# deducted from that team's score for the round at submission time. Re-requesting
+# an already-unlocked tier is free (no double penalty) — it just re-sends the text,
+# which matters for refresh-resume.
+
+@app.post("/api/hint/request")
+async def request_hint(payload: HintRequestModel):
+    team = await authenticate_team(payload.team_id, payload.password)
+
+    existing_sub = await submissions_col.find_one({
+        "team_id": team["team_id"],
+        "round_number": payload.round_number
+    })
+    if existing_sub:
+        raise HTTPException(status_code=400, detail="This round has already been submitted.")
+
+    round_doc = await round_state_col.find_one({"round_number": payload.round_number})
+    if not round_doc or not round_doc.get("is_open"):
+        raise HTTPException(status_code=423, detail="Round is not currently open.")
+
+    q_doc = await questions_col.find_one({"round_number": payload.round_number})
+    if not q_doc:
+        raise HTTPException(status_code=404, detail="Round question bank not found.")
+
+    hint = next((h for h in q_doc.get("hints", []) if h["tier"] == payload.tier), None)
+    if not hint:
+        raise HTTPException(status_code=404, detail="No such hint tier for this round.")
+
+    session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": payload.round_number})
+    hints_used = session.get("hints_used", []) if session else []
+
+    if payload.tier > 1 and (payload.tier - 1) not in hints_used:
+        raise HTTPException(status_code=400, detail="Unlock the previous hint tier first.")
+
+    if payload.tier not in hints_used:
+        hints_used = sorted(hints_used + [payload.tier])
+        await sessions_col.update_one(
+            {"team_id": team["team_id"], "round_number": payload.round_number},
+            {"$set": {"hints_used": hints_used}},
+            upsert=True
+        )
+
+    return {
+        "status": "success",
+        "tier": hint["tier"],
+        "point_cost": hint["point_cost"],
+        "text": hint["text"]
     }
 
 @app.post("/api/submit-quiz")
 async def submit_quiz(payload: SubmitQuizRequest):
-    team = await teams_col.find_one({
-        "team_id": payload.team_id.strip().upper(),
-        "password": payload.password.strip().upper()
+    team = await authenticate_team(payload.team_id, payload.password)
+
+    existing_sub = await submissions_col.find_one({
+        "team_id": team["team_id"],
+        "round_number": payload.round_number
     })
-    if not team:
-        raise HTTPException(status_code=401, detail="Authentication failed.")
+    if existing_sub:
+        raise HTTPException(status_code=400, detail="This round has already been submitted for this team.")
 
     doc = await questions_col.find_one({"round_number": payload.round_number})
     if not doc:
@@ -375,40 +588,69 @@ async def submit_quiz(payload: SubmitQuizRequest):
 
     score = 0
     detailed_results = {}
-    
+
     for q in doc.get("questions", []):
         q_id = q["id"]
         correct_ans = q.get("correct_answer", "")
         user_ans = str(payload.answers.get(q_id, "")).strip()
+        q_points = q.get("points") or 4  # falls back to 4 for Round 1, which has no explicit weighting
 
         is_correct = (
             user_ans.upper() == correct_ans.upper()
             or normalize_text(user_ans) == normalize_text(correct_ans)
         )
         if is_correct:
-            score += 4
+            score += q_points
 
         detailed_results[q_id] = {
             "user_answer": user_ans,
             "correct_answer": correct_ans,
-            "is_correct": is_correct
+            "is_correct": is_correct,
+            "points_available": q_points
         }
+
+    # Apply hint penalties recorded server-side during the round — never trust a
+    # client-reported hint list for scoring.
+    session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": payload.round_number})
+    hints_used = session.get("hints_used", []) if session else []
+    hint_cost_map = {h["tier"]: h["point_cost"] for h in doc.get("hints", [])}
+    hint_penalty = sum(hint_cost_map.get(t, 0) for t in hints_used)
+    score = max(0, score - hint_penalty)
 
     if payload.submission_status == "DISQUALIFIED":
         await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"status": "ELIMINATED"}})
+
+    # Server-anchored timing: ranking is based on wall-clock time since the ADMIN
+    # opened the round, not on anything the client reports.
+    round_doc = await round_state_col.find_one({"round_number": payload.round_number})
+    now = datetime.now(timezone.utc)
+    if round_doc and round_doc.get("opened_at"):
+        opened_at = round_doc["opened_at"]
+        if opened_at.tzinfo is None:
+            opened_at = opened_at.replace(tzinfo=timezone.utc)
+        server_time_taken = max(0, int((now - opened_at).total_seconds()))
+    else:
+        server_time_taken = payload.time_taken_seconds
 
     record = {
         "team_id": team["team_id"],
         "round_number": payload.round_number,
         "score": score,
-        "max_score": len(doc.get("questions", [])) * 4,
-        "time_taken_seconds": payload.time_taken_seconds,
+        "max_score": sum((q.get("points") or 4) for q in doc.get("questions", [])),
+        "hint_penalty": hint_penalty,
+        "hints_used": hints_used,
+        "time_taken_seconds": server_time_taken,
+        "client_reported_time_seconds": payload.time_taken_seconds,
         "tab_switch_count": payload.tab_switch_count,
         "submission_status": payload.submission_status,
         "detailed_results": detailed_results,
-        "submitted_at_utc": datetime.now(timezone.utc),
+        "submitted_at_utc": now,
         "submitted_at_local": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
     await submissions_col.insert_one(record)
-    return {"status": "success", "score": score, "team_id": team["team_id"]}
+    await sessions_col.update_one(
+        {"team_id": team["team_id"], "round_number": payload.round_number},
+        {"$set": {"status": "SUBMITTED"}}
+    )
+    return {"status": "success", "score": score, "hint_penalty": hint_penalty, "team_id": team["team_id"]}

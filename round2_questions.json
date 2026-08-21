@@ -5,13 +5,32 @@
       "id": "Q1",
       "type": "text",
       "text": "Decode the T9 mobile keypad cipher [ 7777 - 33 - 777 - 888 - 33 - 777 ]. What is the decoded keyword?",
-      "correct_answer": "SERVER"
+      "correct_answer": "SERVER",
+      "points": 40
     },
     {
       "id": "Q2",
       "type": "text",
       "text": "Using the Infrastructure Node Directory, look up the decoded keyword under Cluster Alias. What is its Physical Deployment Zone?",
-      "correct_answer": "ARCHIVE VAULT"
+      "correct_answer": "ARCHIVE VAULT",
+      "points": 60
+    }
+  ],
+  "hints": [
+    {
+      "tier": 1,
+      "point_cost": 0,
+      "text": "Look at the numbers as old mobile keypad (T9) taps, where pressing the key multiple times picks the position of the letter."
+    },
+    {
+      "tier": 2,
+      "point_cost": 5,
+      "text": "The sequence spells out an IT infrastructure term found in the Cluster Alias column of Document B."
+    },
+    {
+      "tier": 3,
+      "point_cost": 10,
+      "text": "The decoded word is SERVER. Check the table for SERVER and write down its Physical Deployment Zone."
     }
   ]
 }

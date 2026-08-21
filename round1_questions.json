@@ -46,17 +46,29 @@
     {
       "id": "Q7",
       "type": "mcq",
-      "text": "What will be the output? x = 17; y = 5; print(x % y)",
+      "text": "Which of the following is primarily used for generating synthetic images and deepfakes?",
       "options": [
-        { "k": "A", "t": "2" },
-        { "k": "B", "t": "3" },
-        { "k": "C", "t": "3.4" },
-        { "k": "D", "t": "4" }
+        { "k": "A", "t": "Support Vector Machine" },
+        { "k": "B", "t": "Generative Adversarial Network (GAN)" },
+        { "k": "C", "t": "Linear Regression" },
+        { "k": "D", "t": "K-Means Clustering" }
       ],
       "correct_answer": "B"
     },
     {
       "id": "Q8",
+      "type": "mcq",
+      "text": "Which of the following models is specialized for text-to-image generation?",
+      "options": [
+        { "k": "A", "t": "Stable Diffusion" },
+        { "k": "B", "t": "Linear Discriminant Analysis" },
+        { "k": "C", "t": "Naive Bayes" },
+        { "k": "D", "t": "Random Forest" }
+      ],
+      "correct_answer": "A"
+    },
+    {
+      "id": "Q9",
       "type": "mcq",
       "text": "Two resistors of 6 \u03a9 each are connected in parallel. Their equivalent resistance is:",
       "options": [
@@ -68,7 +80,19 @@
       "correct_answer": "B"
     },
     {
-      "id": "Q9",
+      "id": "Q10",
+      "type": "mcq",
+      "text": "A 12 V battery is connected across a 4 \u03a9 resistor. What is the power dissipated?",
+      "options": [
+        { "k": "A", "t": "3 W" },
+        { "k": "B", "t": "24 W" },
+        { "k": "C", "t": "36 W" },
+        { "k": "D", "t": "48 W" }
+      ],
+      "correct_answer": "C"
+    },
+    {
+      "id": "Q11",
       "type": "mcq",
       "text": "In a certain code, every letter is replaced by the next letter of the alphabet. If MANGO \u2192 NBOPH, then APPLE \u2192 ?",
       "options": [
@@ -80,7 +104,19 @@
       "correct_answer": "B"
     },
     {
-      "id": "Q10",
+      "id": "Q12",
+      "type": "mcq",
+      "text": "In a certain code, every letter is shifted forward by 2 positions. If CAT \u2192 ECV, then BIRD \u2192 ?",
+      "options": [
+        { "k": "A", "t": "DKUF" },
+        { "k": "B", "t": "DJTF" },
+        { "k": "C", "t": "DKTE" },
+        { "k": "D", "t": "CJSE" }
+      ],
+      "correct_answer": "A"
+    },
+    {
+      "id": "Q13",
       "type": "mcq",
       "text": "A processor operates at 3 GHz. Approximately how many clock cycles occur in 1 microsecond?",
       "options": [
@@ -92,7 +128,19 @@
       "correct_answer": "B"
     },
     {
-      "id": "Q11",
+      "id": "Q14",
+      "type": "mcq",
+      "text": "If a CPU has a clock cycle time of 0.5 nanoseconds, what is its clock frequency?",
+      "options": [
+        { "k": "A", "t": "500 MHz" },
+        { "k": "B", "t": "1 GHz" },
+        { "k": "C", "t": "2 GHz" },
+        { "k": "D", "t": "4 GHz" }
+      ],
+      "correct_answer": "C"
+    },
+    {
+      "id": "Q15",
       "type": "mcq",
       "text": "You have 8 identical-looking balls, but one ball is heavier. Using a balance scale, what is the minimum number of weighings required to guarantee finding the heavier ball?",
       "options": [
@@ -102,30 +150,6 @@
         { "k": "D", "t": "4" }
       ],
       "correct_answer": "B"
-    },
-    {
-      "id": "Q12",
-      "type": "text",
-      "text": "CNN stands for ________________________________________ in deep learning.",
-      "correct_answer": "Convolutional Neural Network"
-    },
-    {
-      "id": "Q13",
-      "type": "text",
-      "text": "The standard test proposed in 1950 to evaluate machine intelligence is the ____________________ Test.",
-      "correct_answer": "Turing"
-    },
-    {
-      "id": "Q14",
-      "type": "text",
-      "text": "Gemini was developed by ________________________.",
-      "correct_answer": "Google"
-    },
-    {
-      "id": "Q15",
-      "type": "text",
-      "text": "NLP stands for ________________________________________.",
-      "correct_answer": "Natural Language Processing"
     }
   ]
 }
