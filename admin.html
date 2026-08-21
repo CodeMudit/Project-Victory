@@ -81,7 +81,7 @@
     .badge-open { background: rgba(0,255,140,0.12); color: #00ff8c; border: 1px solid #00ff8c; }
     .badge-locked { background: rgba(255,184,51,0.12); color: var(--gold); border: 1px solid var(--gold); }
     .gate-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .gate-row select { margin-bottom: 0; }
+    .gate-row select, .gate-row input { margin-bottom: 0; }
     .muted { font-size: 12px; color: #7a8a94; }
   </style>
 </head>
@@ -95,22 +95,23 @@
     <button onclick="refreshLeaderboard()" style="width: auto; padding: 10px 20px;">SYNC DASHBOARD</button>
   </div>
 
-  <!-- ROUND GATE CONTROL & OVERRIDES -->
+  <!-- ROUND GATE & OFFICIAL TIME BAR CONTROLS -->
   <div class="card">
-    <h2>&gt; ROUND GATE CONTROL & EMERGENCY ENGINE</h2>
-    <p class="muted" style="margin-bottom: 12px;">Teams cannot log in to a round until it is OPENED here.</p>
+    <h2>&gt; ROUND GATE CONTROL & OFFICIAL DURATION ENGINE</h2>
+    <p class="muted" style="margin-bottom: 12px;">Opening a round starts the universal scoring clock. When the time expires or when you click FORCE SUBMIT ALL, all teams are evaluated and submitted automatically.</p>
     <div class="gate-row">
-      <select id="gateRoundSelect" onchange="refreshGateStatus()" style="max-width: 160px;">
+      <select id="gateRoundSelect" onchange="refreshGateStatus()" style="max-width: 140px;">
         <option value="1">Round 1</option><option value="2">Round 2</option>
         <option value="3">Round 3</option><option value="4">Round 4</option>
       </select>
+      <input type="number" id="roundDurationInput" value="10" min="1" max="180" placeholder="MINUTES" style="max-width: 110px;" title="Duration in minutes">
       <span id="gateStatusBadge" class="badge badge-locked">LOCKED</span>
-      <span id="gateOpenedAt" class="muted"></span>
+      <span id="gateTimerCountdown" style="color:var(--gold); font-weight:bold; font-size:15px;"></span>
       <div style="flex: 1;"></div>
-      <button onclick="openRound()" style="width: auto; padding: 10px 18px;">OPEN ROUND</button>
-      <button onclick="closeRound()" class="btn-danger" style="width: auto; padding: 10px 18px;">CLOSE ROUND</button>
-      <button onclick="forceSubmitCurrentRound()" class="btn-warning" style="width: auto; padding: 10px 18px;">⚡ FORCE SUBMIT ALL</button>
-      <button onclick="undoRound()" class="btn-danger" style="width: auto; padding: 10px 18px;">↺ RESET ROUND</button>
+      <button onclick="openRound()" style="width: auto; padding: 10px 16px;">START ROUND CLOCK</button>
+      <button onclick="closeRound()" class="btn-danger" style="width: auto; padding: 10px 16px;">LOCK ROUND</button>
+      <button onclick="forceSubmitCurrentRound()" class="btn-warning" style="width: auto; padding: 10px 16px;">⚡ FORCE SUBMIT ALL</button>
+      <button onclick="undoRound()" class="btn-danger" style="width: auto; padding: 10px 16px;">↺ RESET ROUND</button>
     </div>
     <div id="gateMsg" style="font-size: 12px; margin-top: 6px;"></div>
   </div>
@@ -129,7 +130,7 @@
           </select>
           <button onclick="addBlankQuestion()" style="width: 140px;">+ ADD NODE</button>
         </div>
-        <div id="questionListContainer" style="max-height: 420px; overflow-y: auto; margin-top: 15px; padding-right: 5px;"></div>
+        <div id="questionListContainer" style="max-height: 380px; overflow-y: auto; margin-top: 15px; padding-right: 5px;"></div>
         <button onclick="saveQuestionBank()" class="btn-warning" style="margin-top: 10px;">SAVE & SYNC TO DB</button>
         <div id="qSaveMsg" style="font-size: 12px; margin-top: 6px;"></div>
       </div>
@@ -137,16 +138,14 @@
       <!-- HINT LADDER EDITOR -->
       <div class="card">
         <h2>&gt; HINT LADDER MANAGER</h2>
-        <p class="muted" style="margin-bottom: 10px;">Configure hints. Hints deduct points upon access.</p>
-        <div id="hintListContainer" style="max-height: 260px; overflow-y: auto;"></div>
+        <div id="hintListContainer" style="max-height: 240px; overflow-y: auto;"></div>
         <button onclick="addBlankHint()" style="width: auto; padding: 8px 16px;">+ ADD HINT TIER</button>
-        <div id="hintSaveNote" class="muted" style="margin-top: 8px;">Hints save together with the question bank above.</div>
       </div>
 
       <!-- CASE FILES / EVIDENCE DOSSIER EDITOR -->
       <div class="card">
         <h2>&gt; CASE FILES / EVIDENCE DOSSIER (HTML)</h2>
-        <textarea id="briefingEditor" style="height: 220px; font-size: 12px;" placeholder="<div class='evidence-doc'>...</div>"></textarea>
+        <textarea id="briefingEditor" style="height: 200px; font-size: 12px;" placeholder="<div class='evidence-doc'>...</div>"></textarea>
       </div>
 
       <!-- TEAM REGISTRATION -->
@@ -156,26 +155,14 @@
           <input type="number" id="teamCountInput" value="10" min="1" max="200" placeholder="NUMBER OF TEAMS" style="flex: 1;">
           <button onclick="renderTeamNameInputs()" style="width: 160px;">SET TEAM COUNT</button>
         </div>
-        <div id="teamNameInputsContainer" style="max-height: 280px; overflow-y: auto; margin: 10px 0;"></div>
+        <div id="teamNameInputsContainer" style="max-height: 240px; overflow-y: auto; margin: 10px 0;"></div>
         <button onclick="generateAllTeamCredentials()" class="btn-warning" id="generateAllBtn" style="display: none;">GENERATE ALL TEAM ID'S & ACCESS KEYS</button>
         <div id="credGenMsg" style="font-size: 12px; margin-top: 6px;"></div>
-      </div>
-
-      <!-- ALL TEAM CREDENTIALS -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <h2>&gt; ALL TEAM CREDENTIALS</h2>
-          <button onclick="loadAllTeams()" style="width: auto; padding: 6px 14px;">REFRESH</button>
-        </div>
-        <input type="text" id="teamSearchInput" placeholder="SEARCH BY TEAM ID OR NAME" style="text-transform: uppercase;" oninput="filterTeamsTable()">
-        <table>
-          <thead><tr><th>Team ID</th><th>Team Name</th><th>Access Key</th><th>Round</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="allTeamsBody"><tr><td colspan="6">Loading...</td></tr></tbody>
-        </table>
       </div>
     </div>
 
     <div>
+      <!-- LIVE TOURNAMENT RANKINGS & ACTIVE LOGINS -->
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <h2>&gt; ROUND <span id="viewingRoundNum">1</span> LIVE TOURNAMENT RANKINGS</h2>
@@ -193,9 +180,22 @@
         </table>
       </div>
 
+      <!-- ALL TEAM CREDENTIALS & ACTIVE LOGIN MONITOR -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h2>&gt; ACTIVE LOGIN ROSTER & CREDENTIALS</h2>
+          <button onclick="loadAllTeams()" style="width: auto; padding: 6px 14px;">REFRESH</button>
+        </div>
+        <input type="text" id="teamSearchInput" placeholder="SEARCH BY TEAM ID OR NAME" style="text-transform: uppercase;" oninput="filterTeamsTable()">
+        <table>
+          <thead><tr><th>Team ID</th><th>Team Name</th><th>Access Key</th><th>Round</th><th>Logged In?</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="allTeamsBody"><tr><td colspan="7">Loading...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- PROMOTION AUTOMATOR -->
       <div class="card">
         <h2>&gt; TOURNAMENT PROMOTION AUTOMATOR</h2>
-        <p class="muted" style="margin-bottom: 12px;">Promote top teams to next round. Unpromoted teams will be marked ELIMINATED.</p>
         <div style="display: flex; gap: 15px;">
           <div style="flex: 1;"><label>Promote Top N Teams:</label><input type="number" id="promoteTopN" value="10" min="1"></div>
           <div style="flex: 1;"><label>Target Round:</label>
@@ -217,16 +217,18 @@
       const api = document.getElementById('apiBase').value;
       const round = document.getElementById('gateRoundSelect').value;
       const badge = document.getElementById('gateStatusBadge');
-      const openedAtEl = document.getElementById('gateOpenedAt');
+      const timerEl = document.getElementById('gateTimerCountdown');
       try {
         const res = await fetch(`${api}/api/round/${round}/status`);
         const data = await res.json();
         if (data.is_open) {
           badge.className = 'badge badge-open'; badge.innerText = 'OPEN';
-          openedAtEl.innerText = data.opened_at ? `Opened: ${new Date(data.opened_at).toLocaleTimeString()}` : '';
+          const mins = Math.floor(data.remaining_seconds / 60);
+          const secs = data.remaining_seconds % 60;
+          timerEl.innerText = `Time Left: ${mins}m ${secs}s`;
         } else {
           badge.className = 'badge badge-locked'; badge.innerText = 'LOCKED';
-          openedAtEl.innerText = '';
+          timerEl.innerText = '';
         }
       } catch (err) { badge.className = 'badge badge-locked'; badge.innerText = 'UNKNOWN'; }
     }
@@ -235,12 +237,17 @@
       const api = document.getElementById('apiBase').value;
       const key = document.getElementById('adminKey').value;
       const round = document.getElementById('gateRoundSelect').value;
+      const duration = parseInt(document.getElementById('roundDurationInput').value) || 10;
       const msg = document.getElementById('gateMsg');
-      if (!confirm(`Open Round ${round}?`)) return;
+      if (!confirm(`Open Round ${round} for ${duration} minutes? The scoring clock starts for all teams immediately.`)) return;
       try {
-        const res = await fetch(`${api}/api/admin/round/${round}/open`, { method: "POST", headers: { "x-admin-key": key } });
+        const res = await fetch(`${api}/api/admin/round/${round}/open`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-key": key },
+          body: JSON.stringify({ duration_minutes: duration })
+        });
         const data = await res.json();
-        if (res.ok) { msg.innerHTML = `<span style="color:var(--accent)">&gt; ROUND ${round} IS NOW OPEN.</span>`; refreshGateStatus(); }
+        if (res.ok) { msg.innerHTML = `<span style="color:var(--accent)">&gt; ROUND ${round} IS OPEN FOR ${duration} MINUTES.</span>`; refreshGateStatus(); }
         else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
       } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
     }
@@ -250,7 +257,7 @@
       const key = document.getElementById('adminKey').value;
       const round = document.getElementById('gateRoundSelect').value;
       const msg = document.getElementById('gateMsg');
-      if (!confirm(`Close Round ${round}?`)) return;
+      if (!confirm(`Lock Round ${round}?`)) return;
       try {
         const res = await fetch(`${api}/api/admin/round/${round}/close`, { method: "POST", headers: { "x-admin-key": key } });
         const data = await res.json();
@@ -264,12 +271,14 @@
       const key = document.getElementById('adminKey').value;
       const round = document.getElementById('gateRoundSelect').value;
       const msg = document.getElementById('gateMsg');
-      if (!confirm(`Force-submit all unsubmitted teams for Round ${round}?`)) return;
+      if (!confirm(`FORCE SUBMIT ALL teams for Round ${round}? All in-progress and unstarted qualified teams will be evaluated and submitted immediately.`)) return;
       try {
         const res = await fetch(`${api}/api/admin/round/${round}/force-submit`, { method: "POST", headers: { "x-admin-key": key } });
         const data = await res.json();
-        if (res.ok) { msg.innerHTML = `<span style="color:var(--accent)">&gt; FORCE SUBMITTED ${data.force_submitted_count} SESSIONS.</span>`; refreshLeaderboard(); }
-        else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
+        if (res.ok) {
+          msg.innerHTML = `<span style="color:var(--accent)">&gt; SUCCESS: FORCE-SUBMITTED AND EVALUATED ${data.force_submitted_count} TEAMS.</span>`;
+          refreshLeaderboard(); refreshGateStatus(); loadAllTeams();
+        } else { msg.innerHTML = `<span style="color:var(--danger)">&gt; ERROR: ${data.detail}</span>`; }
       } catch (err) { msg.innerHTML = `<span style="color:var(--danger)">&gt; REQUEST FAILED: ${err}</span>`; }
     }
 
@@ -467,11 +476,16 @@
 
     function renderTeamsTable(teams) {
       const tbody = document.getElementById('allTeamsBody');
-      if (teams.length === 0) { tbody.innerHTML = `<tr><td colspan="6">No matching teams.</td></tr>`; return; }
+      if (teams.length === 0) { tbody.innerHTML = `<tr><td colspan="7">No matching teams.</td></tr>`; return; }
       tbody.innerHTML = teams.map(t => `
         <tr class="${t.status === 'ELIMINATED' ? 'elim-row' : ''}">
           <td>${t.team_id}</td><td>${t.team_name}</td><td style="color:var(--gold)">${t.password}</td>
           <td>${t.current_round}</td>
+          <td>
+            ${t.has_logged_in 
+              ? `<span style="color:var(--accent)">ONLINE [${t.session_status}]</span>` 
+              : `<span style="color:#7a8a94">NOT LOGGED IN</span>`}
+          </td>
           <td><span class="badge ${t.status === 'QUALIFIED' ? 'badge-qual' : 'badge-elim'}">${t.status}</span></td>
           <td style="display:flex; gap:6px;">
             ${t.status === 'ELIMINATED' ? `<button onclick="undoElimination('${t.team_id}')" style="width:auto; padding:2px 6px; font-size:11px;" class="btn-warning">REVIVE</button>` : ''}
@@ -493,10 +507,10 @@
       try {
         const res = await fetch(`${api}/api/admin/teams`, { headers: { "x-admin-key": key } });
         const data = await res.json();
-        if (!res.ok) { tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger)">ERROR: ${data.detail || 'Failed to load teams.'}</td></tr>`; return; }
+        if (!res.ok) { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger)">ERROR: ${data.detail || 'Failed to load teams.'}</td></tr>`; return; }
         allTeamsCache = data.teams;
         filterTeamsTable();
-      } catch (err) { tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger)">REQUEST FAILED: ${err}</td></tr>`; }
+      } catch (err) { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger)">REQUEST FAILED: ${err}</td></tr>`; }
     }
 
     async function undoElimination(teamId) {
@@ -525,11 +539,10 @@
       if (!res.ok) return;
 
       document.getElementById('liveTelemetry').innerHTML = `
-        Registered: <strong>${data.total_registered}</strong> | Received: <strong>${data.total_submitted}</strong> |
-        Status: ${data.all_teams_submitted ? '<span style="color:var(--accent)">[ALL NODES SYNCED]</span>' : '<span style="color:var(--gold)">[ROUND RUNNING]</span>'}`;
+        Qualified: <strong>${data.total_registered}</strong> | Logged In: <strong>${data.active_logins}</strong> | Received: <strong>${data.total_submitted}</strong>`;
 
       const tbody = document.getElementById('boardBody');
-      if (data.leaderboard.length === 0) { tbody.innerHTML = `<tr><td colspan="8">No logs received for Round ${round}.</td></tr>`; return; }
+      if (data.leaderboard.length === 0) { tbody.innerHTML = `<tr><td colspan="8">No submissions recorded for Round ${round}.</td></tr>`; return; }
 
       tbody.innerHTML = data.leaderboard.map(r => `
         <tr class="${r.status === 'ELIMINATED' ? 'elim-row' : ''}">
@@ -568,7 +581,8 @@
     loadAllTeams();
     refreshGateStatus();
     setInterval(refreshLeaderboard, 4000);
-    setInterval(refreshGateStatus, 5000);
+    setInterval(refreshGateStatus, 4000);
+    setInterval(loadAllTeams, 6000);
   </script>
 </body>
 </html>

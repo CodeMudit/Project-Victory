@@ -20,7 +20,7 @@
       --gold: #ffcc33;
       --danger: #ff3f5e;
       --bg: #050b09;
-      --panel: rgba(4, 20, 13, 0.92);
+      --panel: rgba(4, 20, 13, 0.94);
     }
 
     body {
@@ -52,12 +52,12 @@
 
     .terminal-card {
       width: 100%;
-      max-width: 880px;
+      max-width: 950px;
       background: var(--panel);
       border: 1px solid var(--accent-dim);
       box-shadow: 0 0 0 1px rgba(0,255,140,0.08), 0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(0,255,140,0.08);
       border-radius: 14px;
-      padding: 32px;
+      padding: 30px;
       position: relative;
       z-index: 5;
       backdrop-filter: blur(6px);
@@ -70,7 +70,7 @@
     .header-bar {
       border-bottom: 1px solid var(--accent-dim);
       padding-bottom: 14px;
-      margin-bottom: 22px;
+      margin-bottom: 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -81,13 +81,29 @@
       gap: 10px;
     }
 
+    /* GLOBAL ROUND TIMER BAR */
+    .round-timer-box {
+      background: rgba(255,204,51,0.08);
+      border: 1px solid #ffcc3355;
+      padding: 8px 14px;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      color: var(--gold);
+    }
+    .round-timer-clock { font-size: 18px; font-weight: bold; font-family: 'VT323', monospace; letter-spacing: 1px; }
+
     .progress-track {
       width: 100%;
       height: 6px;
       background: rgba(0,255,140,0.1);
       border-radius: 4px;
       overflow: hidden;
-      margin-bottom: 22px;
+      margin-bottom: 18px;
     }
     .progress-fill {
       height: 100%;
@@ -98,12 +114,12 @@
 
     .timer-badge {
       color: var(--gold);
-      font-size: 28px;
+      font-size: 26px;
       text-shadow: 0 0 10px rgba(255,204,51,0.5);
     }
     .timer-warning { color: var(--danger) !important; animation: pulse 0.7s infinite alternate; }
 
-    .options-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 22px; }
+    .options-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
 
     .opt-btn {
       background: rgba(0,255,140,0.05);
@@ -176,10 +192,67 @@
       padding: 4px 12px; border-radius: 20px; font-size: 12px; font-family: 'Orbitron', sans-serif;
     }
 
+    /* EVIDENCE / CASE FILES ARCHIVE DRAWER */
+    .evidence-toggle-btn {
+      background: rgba(0,255,140,0.08);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      padding: 12px 16px;
+      width: 100%;
+      cursor: pointer;
+      border-radius: 8px;
+      margin: 12px 0;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .evidence-toggle-btn:hover { background: var(--accent); color: #041008; }
+    .evidence-panel {
+      margin-top: 8px;
+      border: 1px solid var(--accent-dim);
+      background: rgba(2, 12, 8, 0.96);
+      border-radius: 10px;
+      padding: 18px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .evidence-doc { margin-bottom: 20px; }
+    .evidence-doc:last-child { margin-bottom: 0; }
+    .evidence-doc-title {
+      font-family: 'Orbitron', sans-serif; font-size: 13px; color: var(--gold);
+      letter-spacing: 1px; margin-bottom: 8px; border-bottom: 1px solid var(--accent-dim);
+      padding-bottom: 6px;
+    }
+    .ascii-block {
+      white-space: pre-wrap;
+      background: rgba(0,255,140,0.04);
+      border-left: 3px solid var(--accent);
+      padding: 10px 14px;
+      font-size: 15px;
+      line-height: 1.45;
+      margin-bottom: 10px;
+      border-radius: 0 6px 6px 0;
+    }
+    .evidence-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 15px; }
+    .evidence-table th, .evidence-table td { border: 1px solid var(--accent-dim); padding: 7px 9px; text-align: left; }
+    .evidence-table th {
+      background: rgba(0,255,140,0.1); color: var(--gold);
+      font-family: 'Orbitron', sans-serif; font-size: 11px; letter-spacing: 0.5px;
+    }
+    .evidence-note { font-size: 14px; color: #7fffb0; font-style: italic; margin-top: 4px; }
+    .suspect-card { border: 1px dashed var(--accent-dim); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    .suspect-card:last-child { margin-bottom: 0; }
+    .suspect-name { color: var(--gold); font-family: 'Orbitron', sans-serif; font-size: 13px; margin-bottom: 6px; }
+
+    /* HINT LADDER */
     .hint-panel {
-      margin-top: 24px;
+      margin-top: 22px;
       border-top: 1px dashed var(--accent-dim);
-      padding-top: 16px;
+      padding-top: 14px;
     }
     .hint-panel-title {
       font-family: 'Orbitron', sans-serif; font-size: 13px; color: var(--gold);
@@ -210,60 +283,6 @@
       color: #ffe9a8;
       border-radius: 0 6px 6px 0;
     }
-
-    .evidence-toggle-btn {
-      background: rgba(0,255,140,0.06);
-      border: 1px solid var(--accent-dim);
-      color: var(--accent);
-      font-family: 'Orbitron', sans-serif;
-      font-size: 13px;
-      letter-spacing: 0.5px;
-      padding: 12px 16px;
-      width: 100%;
-      cursor: pointer;
-      border-radius: 8px;
-      margin-top: 16px;
-      text-align: left;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .evidence-toggle-btn:hover { border-color: var(--accent); background: rgba(0,255,140,0.1); }
-    .evidence-panel {
-      margin-top: 10px;
-      border: 1px dashed var(--accent-dim);
-      border-radius: 10px;
-      padding: 16px;
-      max-height: 380px;
-      overflow-y: auto;
-    }
-    .evidence-doc { margin-bottom: 18px; }
-    .evidence-doc:last-child { margin-bottom: 0; }
-    .evidence-doc-title {
-      font-family: 'Orbitron', sans-serif; font-size: 12px; color: var(--gold);
-      letter-spacing: 1px; margin-bottom: 8px; border-bottom: 1px solid var(--accent-dim);
-      padding-bottom: 6px;
-    }
-    .ascii-block {
-      white-space: pre-wrap;
-      background: rgba(0,255,140,0.04);
-      border-left: 3px solid var(--accent-dim);
-      padding: 10px 14px;
-      font-size: 15px;
-      line-height: 1.45;
-      margin-bottom: 10px;
-      border-radius: 0 6px 6px 0;
-    }
-    .evidence-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 15px; }
-    .evidence-table th, .evidence-table td { border: 1px solid var(--accent-dim); padding: 6px 8px; text-align: left; }
-    .evidence-table th {
-      background: rgba(0,255,140,0.08); color: var(--gold);
-      font-family: 'Orbitron', sans-serif; font-size: 10.5px; letter-spacing: 0.5px;
-    }
-    .evidence-note { font-size: 14px; color: #7fffb0; font-style: italic; margin-top: 4px; }
-    .suspect-card { border: 1px dashed var(--accent-dim); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
-    .suspect-card:last-child { margin-bottom: 0; }
-    .suspect-name { color: var(--gold); font-family: 'Orbitron', sans-serif; font-size: 12px; margin-bottom: 6px; }
 
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.92);
@@ -296,28 +315,30 @@
   <!-- SCREEN 1B: WAITING FOR ADMIN -->
   <div class="terminal-card hidden" id="waitingRoundScreen">
     <div class="header-bar"><div>PROJECT NEXUS // HOLDING PATTERN</div></div>
-    <p><span class="pulse-dot"></span>STANDING BY: ROUND <span id="waitingRoundNum">-</span> HAS NOT BEEN OPENED BY THE ADMIN YET.</p>
-    <p class="muted-text">This screen advances automatically the instant the round is unlocked.</p>
+    <p><span class="pulse-dot"></span>STANDING BY: ROUND <span id="waitingRoundNum">-</span> IS CURRENTLY LOCKED BY THE ADMIN.</p>
+    <p class="muted-text">This screen advances automatically the moment the round is opened.</p>
   </div>
 
   <!-- SCREEN 1C: PRE-ROUND BRIEFING -->
   <div class="terminal-card hidden" id="startScreen">
     <div class="header-bar">
-      <div>PROJECT NEXUS // ROUND <span id="startRoundNum">-</span> BRIEFING</div>
+      <div>PROJECT NEXUS // ROUND <span id="startRoundNum">-</span> BRIEFING & DOSSIER</div>
       <div class="badge-pill" id="startTeamBadge">TEAM: ---</div>
     </div>
-    <div class="instructions-box">
-      &gt; <span id="startInstructions">Round 1: 30 seconds per question. Switching tabs is strictly monitored. Hints deduct points. Once started, attempt cannot be restarted.</span>
+
+    <div class="round-timer-box">
+      <span>ROUND DEADLINE CLOCK:</span>
+      <span class="round-timer-clock" id="briefingRoundClock">--:--</span>
     </div>
-    <p class="muted-text" id="resumeNotice"></p>
-    <p class="muted-text">Mission clock: <span id="missionClock">00:00</span></p>
 
-    <button class="evidence-toggle-btn hidden" id="evidenceToggleBtn">
-      <span>📁 ACCESS CASE FILES / EVIDENCE ARCHIVE</span><span id="evidenceToggleIcon">▾</span>
-    </button>
-    <div class="evidence-panel hidden" id="evidencePanel"></div>
+    <div class="instructions-box" id="briefingExplanationBox">
+      &gt; <span id="startInstructions">Review the case files and evidence dossier below before beginning. You can re-open this evidence archive at any time during the round using the top drawer button.</span>
+    </div>
 
-    <button class="action-btn" id="startRoundBtn">START ROUND</button>
+    <!-- DOSSIER VIEW ON BRIEFING -->
+    <div id="briefingEvidenceContainer" class="evidence-panel" style="max-height: 280px; margin-bottom: 16px;"></div>
+
+    <button class="action-btn" id="startRoundBtn">INITIALIZE ASSESSMENT & ENTER</button>
   </div>
 
   <!-- SCREEN 2: ACTIVE ASSESSMENT -->
@@ -327,6 +348,19 @@
       <div id="progressDisplay">NODE 1/--</div>
       <div class="timer-badge" id="timer">30s</div>
     </div>
+
+    <!-- GLOBAL ROUND CLOCK IN QUIZ -->
+    <div class="round-timer-box">
+      <span>ROUND COUNTDOWN:</span>
+      <span class="round-timer-clock" id="quizRoundClock">--:--</span>
+    </div>
+
+    <!-- IN-QUIZ EVIDENCE ACCORDION -->
+    <button class="evidence-toggle-btn hidden" id="quizEvidenceToggleBtn">
+      <span>📂 VIEW SCENARIO DOSSIER & EVIDENCE ARCHIVE</span><span id="quizEvidenceIcon">▾</span>
+    </button>
+    <div class="evidence-panel hidden" id="quizEvidencePanel" style="margin-bottom: 16px;"></div>
+
     <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
 
     <div id="questionText" style="font-size: 24px; min-height: 55px; line-height: 1.3;"></div>
@@ -338,20 +372,20 @@
     </div>
 
     <div class="hint-panel hidden" id="hintPanel">
-      <div class="hint-panel-title">⚠ HINT TERMINAL — using a hint deducts points from this round's score</div>
+      <div class="hint-panel-title">⚠ HINT TERMINAL — unlocking hints deducts points from score</div>
       <div id="hintTierButtons"></div>
       <div id="hintTextArea"></div>
     </div>
   </div>
 
-  <!-- SCREEN 3: END / POLLING FOR STATUS -->
+  <!-- SCREEN 3: END SCREEN & WAITING PROMOTION -->
   <div class="terminal-card hidden" id="endScreen">
     <div class="header-bar"><div>TRANSMISSION SUMMARY // PROJECT NEXUS</div></div>
-    <p id="endStatus">&gt; LOGS SYNCED TO CENTRAL REPOSITORY.</p>
+    <p id="endStatus">&gt; LOGS TRANSMITTED TO CENTRAL REPOSITORY.</p>
     <p id="subReason" style="margin-top: 10px; color: var(--gold);"></p>
 
     <div id="eliminationStatusArea" style="margin-top: 25px; border-top: 1px dashed var(--accent-dim); padding-top: 15px;">
-      <p id="waitingMsg"><span class="pulse-dot"></span>STANDING BY: POLLING CENTRAL NETWORK FOR ADVANCEMENT STATUS...</p>
+      <p id="waitingMsg"><span class="pulse-dot"></span>STANDING BY: POLLING CENTRAL NETWORK FOR ADVANCEMENT DIRECTIVES...</p>
     </div>
   </div>
 
@@ -381,11 +415,11 @@
     let hintsUsed = [];
     let currentQIdx = 0;
     let timerInterval = null;
-    let missionClockInterval = null;
+    let globalRoundTimerInterval = null;
+    let globalRemainingSeconds = 0;
     let timeLeft = 30;
     let teamId = "", teamPassword = "", teamName = "";
     let activeRound = 1;
-    let roundOpenedAtMs = null;
     let answers = {};
     let tabSwitchCount = 0;
     let warnedAlready = false;
@@ -395,6 +429,7 @@
     let statusPollInterval = null;
     let localElapsedSeconds = 0;
     let totalTimerInterval = null;
+    let currentBriefingHtml = "";
 
     function showScreen(id) {
       ['loginScreen', 'waitingRoundScreen', 'startScreen', 'quizScreen', 'endScreen'].forEach(s => {
@@ -442,7 +477,7 @@
         teamId = data.team_id;
         teamName = data.team_name;
         activeRound = data.current_round;
-        roundOpenedAtMs = Date.parse(data.round_opened_at);
+        globalRemainingSeconds = data.round_remaining_seconds || 600;
 
         currentQIdx = data.resume.current_index || 0;
         answers = data.resume.answers || {};
@@ -454,7 +489,7 @@
         const qData = await qRes.json();
         questions = qData.questions || [];
         roundHints = qData.hints || [];
-        renderEvidencePanel(qData.briefing || "");
+        currentBriefingHtml = qData.briefing || "";
 
         if (questions.length === 0) {
           msg.innerText = "[!] ERROR: NO QUESTIONS CONFIGURED FOR THIS ROUND.";
@@ -466,35 +501,34 @@
         document.getElementById('startTeamBadge').innerText = `TEAM: ${teamName}`;
         document.getElementById('startRoundNum').innerText = activeRound;
 
-        const resumeNotice = document.getElementById('resumeNotice');
-        resumeNotice.innerText = (data.resume.resumed && currentQIdx > 0)
-          ? `> SESSION RESTORED: Resuming from Node ${currentQIdx + 1}/${questions.length}.`
-          : "";
-
-        startMissionClock();
+        renderDossierView();
+        startGlobalRoundTimer();
         showScreen('startScreen');
       } catch (err) {
         if (!isSilentRetry) { msg.innerText = "[!] BACKEND UNREACHABLE. CHECK SERVER."; showScreen('loginScreen'); }
       }
     }
 
-    function renderEvidencePanel(briefingHtml) {
-      const toggleBtn = document.getElementById('evidenceToggleBtn');
-      const panel = document.getElementById('evidencePanel');
-      panel.classList.add('hidden');
-      document.getElementById('evidenceToggleIcon').innerText = '▾';
-      if (!briefingHtml || !briefingHtml.trim()) {
+    function renderDossierView() {
+      const briefingContainer = document.getElementById('briefingEvidenceContainer');
+      const quizPanel = document.getElementById('quizEvidencePanel');
+      const toggleBtn = document.getElementById('quizEvidenceToggleBtn');
+
+      if (currentBriefingHtml && currentBriefingHtml.trim()) {
+        briefingContainer.innerHTML = currentBriefingHtml;
+        briefingContainer.classList.remove('hidden');
+        quizPanel.innerHTML = currentBriefingHtml;
+        toggleBtn.classList.remove('hidden');
+      } else {
+        briefingContainer.innerHTML = "<p class='muted-text'>No evidence files required for this round. Answer questions within the time limit.</p>";
+        quizPanel.innerHTML = "";
         toggleBtn.classList.add('hidden');
-        panel.innerHTML = '';
-        return;
       }
-      toggleBtn.classList.remove('hidden');
-      panel.innerHTML = briefingHtml;
     }
 
-    document.getElementById('evidenceToggleBtn').addEventListener('click', () => {
-      const panel = document.getElementById('evidencePanel');
-      const icon = document.getElementById('evidenceToggleIcon');
+    document.getElementById('quizEvidenceToggleBtn').addEventListener('click', () => {
+      const panel = document.getElementById('quizEvidencePanel');
+      const icon = document.getElementById('quizEvidenceIcon');
       const nowHidden = panel.classList.toggle('hidden');
       icon.innerText = nowHidden ? '▾' : '▴';
     });
@@ -505,20 +539,31 @@
       return m ? parseInt(m[1]) : null;
     }
 
-    function startMissionClock() {
-      clearInterval(missionClockInterval);
-      const el = document.getElementById('missionClock');
-      const tick = () => {
-        if (!roundOpenedAtMs) return;
-        const secs = Math.max(0, Math.floor((Date.now() - roundOpenedAtMs) / 1000));
-        el.innerText = `${Math.floor(secs/60).toString().padStart(2,'0')}:${(secs%60).toString().padStart(2,'0')}`;
+    function startGlobalRoundTimer() {
+      clearInterval(globalRoundTimerInterval);
+      const updateClocks = () => {
+        const mins = Math.floor(globalRemainingSeconds / 60);
+        const secs = globalRemainingSeconds % 60;
+        const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        const bClock = document.getElementById('briefingRoundClock');
+        const qClock = document.getElementById('quizRoundClock');
+        if (bClock) bClock.innerText = timeStr;
+        if (qClock) qClock.innerText = timeStr;
+
+        if (globalRemainingSeconds <= 0) {
+          clearInterval(globalRoundTimerInterval);
+          if (quizActive && !isSubmitting) {
+            finishQuiz("ROUND_TIME_EXPIRED");
+          }
+        }
+        globalRemainingSeconds--;
       };
-      tick();
-      missionClockInterval = setInterval(tick, 1000);
+      updateClocks();
+      globalRoundTimerInterval = setInterval(updateClocks, 1000);
     }
 
     document.getElementById('startRoundBtn').addEventListener('click', () => {
-      clearInterval(missionClockInterval);
       showScreen('quizScreen');
       quizActive = true;
       isSubmitting = false;
@@ -558,7 +603,7 @@
       if (currentQIdx >= questions.length) { finishQuiz("NORMAL_COMPLETION"); return; }
 
       clearInterval(timerInterval);
-      timeLeft = (activeRound === 1) ? 30 : 45; // 30 seconds for round 1
+      timeLeft = (activeRound === 1) ? 30 : 60; // 30 seconds for round 1 questions
       updateTimerDisplay();
 
       const q = questions[currentQIdx];
@@ -601,7 +646,7 @@
     function updateTimerDisplay() {
       const timerEl = document.getElementById('timer');
       timerEl.innerText = `${timeLeft}s`;
-      timerEl.classList.toggle('timer-warning', timeLeft <= 10);
+      timerEl.classList.toggle('timer-warning', timeLeft <= 8);
     }
 
     function selectAnswer(qId, val) {
@@ -676,8 +721,10 @@
 
       if (statusReason === "DISQUALIFIED") {
         document.getElementById('subReason').innerText = "> NOTICE: IMMEDIATE DISQUALIFICATION TRIGGERED.";
+      } else if (statusReason === "ROUND_TIME_EXPIRED") {
+        document.getElementById('subReason').innerText = "> NOTICE: OFFICIAL ROUND DEADLINE EXPIRED. TEST AUTO-SUBMITTED.";
       } else if (statusReason === "TERMINATED_DUE_TO_TAB_SWITCHING") {
-        document.getElementById('subReason').innerText = "> NOTICE: SESSION FORCE-TERMINATED.";
+        document.getElementById('subReason').innerText = "> NOTICE: SESSION FORCE-TERMINATED (TAB SWITCH STRIKES).";
       }
 
       try {

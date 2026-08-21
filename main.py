@@ -1,7 +1,7 @@
 import os
 import secrets
 import string
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -108,6 +108,9 @@ class PromoteTeamsRequest(BaseModel):
     top_n_teams: int
     next_round: int
 
+class OpenRoundRequest(BaseModel):
+    duration_minutes: Optional[int] = 10
+
 def generate_random_password(length=6):
     chars = string.ascii_uppercase + string.digits
     return ''.join(secrets.choice(chars) for _ in range(length))
@@ -117,11 +120,29 @@ def normalize_text(text: str) -> str:
 
 def serialize_round_state(doc):
     if not doc:
-        return {"is_open": False, "opened_at": None}
+        return {"is_open": False, "opened_at": None, "duration_minutes": 10, "expires_at": None, "remaining_seconds": 0}
     opened_at = doc.get("opened_at")
+    duration = doc.get("duration_minutes", 10)
+    is_open = doc.get("is_open", False)
+    
+    expires_at = None
+    remaining_seconds = 0
+    if opened_at and is_open:
+        if opened_at.tzinfo is None:
+            opened_at = opened_at.replace(tzinfo=timezone.utc)
+        exp = opened_at + timedelta(minutes=duration)
+        expires_at = exp.isoformat()
+        now = datetime.now(timezone.utc)
+        remaining_seconds = max(0, int((exp - now).total_seconds()))
+        if remaining_seconds <= 0 and is_open:
+            is_open = False
+
     return {
-        "is_open": doc.get("is_open", False),
-        "opened_at": opened_at.isoformat() if opened_at else None
+        "is_open": is_open,
+        "opened_at": opened_at.isoformat() if opened_at else None,
+        "duration_minutes": duration,
+        "expires_at": expires_at,
+        "remaining_seconds": remaining_seconds
     }
 
 async def authenticate_team(team_id: str, password: str):
@@ -202,7 +223,7 @@ async def get_questions_for_round(round_number: int):
         "briefing": doc.get("briefing", "")
     }
 
-# --- ADMIN ROUND GATING ---
+# --- ADMIN ROUND GATING WITH TIME BAR / DURATION ---
 
 @app.get("/api/round/{round_number}/status")
 async def get_round_status(round_number: int):
@@ -210,21 +231,25 @@ async def get_round_status(round_number: int):
     return {"round_number": round_number, **serialize_round_state(doc)}
 
 @app.post("/api/admin/round/{round_number}/open")
-async def admin_open_round(round_number: int, x_admin_key: str = Header(None)):
+async def admin_open_round(round_number: int, payload: OpenRoundRequest = None, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
 
-    existing = await round_state_col.find_one({"round_number": round_number})
-    if existing and existing.get("is_open"):
-        return {"status": "success", "round_number": round_number, **serialize_round_state(existing)}
-
+    duration = payload.duration_minutes if payload and payload.duration_minutes else 10
     opened_at = datetime.now(timezone.utc)
+    
     await round_state_col.update_one(
         {"round_number": round_number},
-        {"$set": {"round_number": round_number, "is_open": True, "opened_at": opened_at}},
+        {"$set": {
+            "round_number": round_number,
+            "is_open": True,
+            "duration_minutes": duration,
+            "opened_at": opened_at
+        }},
         upsert=True
     )
-    return {"status": "success", "round_number": round_number, "is_open": True, "opened_at": opened_at.isoformat()}
+    doc = await round_state_col.find_one({"round_number": round_number})
+    return {"status": "success", "round_number": round_number, **serialize_round_state(doc)}
 
 @app.post("/api/admin/round/{round_number}/close")
 async def admin_close_round(round_number: int, x_admin_key: str = Header(None)):
@@ -237,6 +262,103 @@ async def admin_close_round(round_number: int, x_admin_key: str = Header(None)):
         upsert=True
     )
     return {"status": "success", "round_number": round_number, "is_open": False}
+
+# --- FORCE SUBMIT & EVALUATE ALL TEAMS ---
+
+async def execute_force_submit(round_number: int):
+    q_doc = await questions_col.find_one({"round_number": round_number}) or {}
+    questions = q_doc.get("questions", [])
+    hints_doc = q_doc.get("hints", [])
+    hint_cost_map = {h["tier"]: h["point_cost"] for h in hints_doc}
+
+    round_doc = await round_state_col.find_one({"round_number": round_number})
+    now = datetime.now(timezone.utc)
+    server_time_taken = 0
+    if round_doc and round_doc.get("opened_at"):
+        opened_at = round_doc["opened_at"]
+        if opened_at.tzinfo is None:
+            opened_at = opened_at.replace(tzinfo=timezone.utc)
+        server_time_taken = max(0, int((now - opened_at).total_seconds()))
+
+    # Get ALL qualified teams that should be in this round or are registered
+    cursor = teams_col.find({"status": "QUALIFIED", "current_round": round_number})
+    teams = await cursor.to_list(length=1000)
+
+    count = 0
+    for t in teams:
+        t_id = t["team_id"]
+        # Check if already submitted
+        existing_sub = await submissions_col.find_one({"team_id": t_id, "round_number": round_number})
+        if existing_sub:
+            continue
+
+        session = await sessions_col.find_one({"team_id": t_id, "round_number": round_number})
+        answers = session.get("answers", {}) if session else {}
+        hints_used = session.get("hints_used", []) if session else []
+        tab_switches = session.get("tab_switch_count", 0) if session else 0
+
+        score = 0
+        detailed_results = {}
+        for q in questions:
+            user_ans = str(answers.get(q["id"], "")).strip()
+            correct_ans = q.get("correct_answer", "")
+            q_points = q.get("points") or 4
+            is_correct = (
+                user_ans.upper() == correct_ans.upper()
+                or normalize_text(user_ans) == normalize_text(correct_ans)
+            )
+            if is_correct:
+                score += q_points
+            detailed_results[q["id"]] = {
+                "user_answer": user_ans,
+                "correct_answer": correct_ans,
+                "is_correct": is_correct,
+                "points_available": q_points
+            }
+
+        penalty = sum(hint_cost_map.get(tier, 0) for tier in hints_used)
+        final_score = max(0, score - penalty)
+
+        sub_record = {
+            "team_id": t_id,
+            "round_number": round_number,
+            "score": final_score,
+            "max_score": sum((q.get("points") or 4) for q in questions),
+            "hint_penalty": penalty,
+            "hints_used": hints_used,
+            "time_taken_seconds": server_time_taken,
+            "tab_switch_count": tab_switches,
+            "submission_status": "FORCE_SUBMITTED",
+            "detailed_results": detailed_results,
+            "submitted_at_utc": now,
+            "submitted_at_local": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        await submissions_col.update_one(
+            {"team_id": t_id, "round_number": round_number},
+            {"$set": sub_record},
+            upsert=True
+        )
+        await sessions_col.update_one(
+            {"team_id": t_id, "round_number": round_number},
+            {"$set": {"status": "SUBMITTED"}},
+            upsert=True
+        )
+        count += 1
+
+    # Lock round after force submit
+    await round_state_col.update_one(
+        {"round_number": round_number},
+        {"$set": {"is_open": False}}
+    )
+    return count
+
+@app.post("/api/admin/round/{round_number}/force-submit")
+async def admin_force_submit(round_number: int, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+    count = await execute_force_submit(round_number)
+    return {"status": "success", "force_submitted_count": count}
 
 # --- ADMIN TOURNAMENT CONTROLS ---
 
@@ -312,12 +434,19 @@ async def admin_list_teams(x_admin_key: str = Header(None)):
 
     result = []
     for t in teams:
+        session = await sessions_col.find_one({"team_id": t["team_id"], "round_number": t.get("current_round", 1)})
+        has_logged_in = session is not None
+        session_status = session.get("status", "NOT_STARTED") if session else "NOT_STARTED"
+        
         result.append({
             "team_id": t["team_id"],
             "team_name": t.get("team_name", ""),
             "password": t.get("password", ""),
             "current_round": t.get("current_round", 1),
-            "status": t.get("status", "QUALIFIED")
+            "status": t.get("status", "QUALIFIED"),
+            "has_logged_in": has_logged_in,
+            "session_status": session_status,
+            "last_active": session.get("last_updated_at").strftime("%H:%M:%S") if (session and session.get("last_updated_at")) else "-"
         })
     return {"status": "success", "total": len(result), "teams": result}
 
@@ -351,13 +480,13 @@ async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(Non
             "submitted_at_local": sub.get("submitted_at_local", "")
         })
 
-    total_registered = await teams_col.count_documents({})
-    all_submitted = len(submissions) >= total_registered if total_registered > 0 else False
+    total_registered = await teams_col.count_documents({"status": "QUALIFIED", "current_round": round_number})
+    active_logins = await sessions_col.count_documents({"round_number": round_number})
 
     return {
         "round": round_number,
-        "all_teams_submitted": all_submitted,
         "total_registered": total_registered,
+        "active_logins": active_logins,
         "total_submitted": len(submissions),
         "leaderboard": leaderboard
     }
@@ -408,63 +537,6 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
         "eliminated_count": eliminated_count,
         "next_round": payload.next_round
     }
-
-# --- NEW ADMIN POWERS: FORCE SUBMIT, UNDO ROUND, UNDO ELIMINATION, DELETE TEAM ---
-
-@app.post("/api/admin/round/{round_number}/force-submit")
-async def admin_force_submit(round_number: int, x_admin_key: str = Header(None)):
-    if x_admin_key != ADMIN_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-
-    active_sessions = await sessions_col.find({"round_number": round_number, "status": {"$ne": "SUBMITTED"}}).to_list(length=500)
-    q_doc = await questions_col.find_one({"round_number": round_number}) or {}
-    questions = q_doc.get("questions", [])
-
-    count = 0
-    now = datetime.now(timezone.utc)
-    for s in active_sessions:
-        t_id = s["team_id"]
-        answers = s.get("answers", {})
-        score = 0
-        for q in questions:
-            user_ans = str(answers.get(q["id"], "")).strip()
-            if user_ans.upper() == q.get("correct_answer", "").upper() or normalize_text(user_ans) == normalize_text(q.get("correct_answer", "")):
-                score += q.get("points", 4)
-
-        hints_used = s.get("hints_used", [])
-        hint_cost_map = {h["tier"]: h["point_cost"] for h in q_doc.get("hints", [])}
-        penalty = sum(hint_cost_map.get(t, 0) for t in hints_used)
-        final_score = max(0, score - penalty)
-
-        round_doc = await round_state_col.find_one({"round_number": round_number})
-        server_time_taken = 0
-        if round_doc and round_doc.get("opened_at"):
-            opened_at = round_doc["opened_at"]
-            if opened_at.tzinfo is None:
-                opened_at = opened_at.replace(tzinfo=timezone.utc)
-            server_time_taken = max(0, int((now - opened_at).total_seconds()))
-
-        await submissions_col.update_one(
-            {"team_id": t_id, "round_number": round_number},
-            {"$set": {
-                "team_id": t_id,
-                "round_number": round_number,
-                "score": final_score,
-                "max_score": sum((q.get("points") or 4) for q in questions),
-                "hint_penalty": penalty,
-                "hints_used": hints_used,
-                "time_taken_seconds": server_time_taken,
-                "tab_switch_count": s.get("tab_switch_count", 0),
-                "submission_status": "FORCE_SUBMITTED_BY_ADMIN",
-                "submitted_at_utc": now,
-                "submitted_at_local": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }},
-            upsert=True
-        )
-        await sessions_col.update_one({"_id": s["_id"]}, {"$set": {"status": "SUBMITTED"}})
-        count += 1
-
-    return {"status": "success", "force_submitted_count": count}
 
 @app.post("/api/admin/round/{round_number}/undo-round")
 async def admin_undo_round(round_number: int, x_admin_key: str = Header(None)):
@@ -518,11 +590,12 @@ async def participant_login(payload: LoginRequest):
         "round_number": current_round
     })
     if existing_sub:
-        raise HTTPException(status_code=400, detail=f"Already submitted Round {current_round}. Please wait for the next round.")
+        raise HTTPException(status_code=400, detail=f"Already submitted Round {current_round}. Please wait for promotion.")
 
     round_doc = await round_state_col.find_one({"round_number": current_round})
-    if not round_doc or not round_doc.get("is_open"):
-        raise HTTPException(status_code=423, detail=f"Round {current_round} has not been started by the admin yet. Please wait.")
+    round_status = serialize_round_state(round_doc)
+    if not round_status["is_open"]:
+        raise HTTPException(status_code=423, detail=f"Round {current_round} is currently LOCKED by admin.")
 
     session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": current_round})
     if session and session.get("status") == "ACTIVE":
@@ -546,7 +619,8 @@ async def participant_login(payload: LoginRequest):
                 "warned": False,
                 "hints_used": [],
                 "status": "ACTIVE",
-                "started_at": datetime.now(timezone.utc)
+                "started_at": datetime.now(timezone.utc),
+                "last_updated_at": datetime.now(timezone.utc)
             }},
             upsert=True
         )
@@ -557,7 +631,9 @@ async def participant_login(payload: LoginRequest):
         "team_id": team["team_id"],
         "team_name": team["team_name"],
         "current_round": current_round,
-        "round_opened_at": round_doc["opened_at"].isoformat(),
+        "round_opened_at": round_status["opened_at"],
+        "round_remaining_seconds": round_status["remaining_seconds"],
+        "round_duration_minutes": round_status["duration_minutes"],
         "resume": resume
     }
 
@@ -569,12 +645,14 @@ async def check_team_status(team_id: str):
 
     current_round = team.get("current_round", 1)
     round_doc = await round_state_col.find_one({"round_number": current_round})
+    round_status = serialize_round_state(round_doc)
 
     return {
         "team_id": team["team_id"],
         "status": team.get("status", "QUALIFIED"),
         "current_round": current_round,
-        "round_open": bool(round_doc and round_doc.get("is_open"))
+        "round_open": round_status["is_open"],
+        "remaining_seconds": round_status["remaining_seconds"]
     }
 
 @app.post("/api/session/progress")
@@ -613,7 +691,8 @@ async def request_hint(payload: HintRequestModel):
         raise HTTPException(status_code=400, detail="This round has already been submitted.")
 
     round_doc = await round_state_col.find_one({"round_number": payload.round_number})
-    if not round_doc or not round_doc.get("is_open"):
+    round_status = serialize_round_state(round_doc)
+    if not round_status["is_open"]:
         raise HTTPException(status_code=423, detail="Round is not currently open.")
 
     q_doc = await questions_col.find_one({"round_number": payload.round_number})
@@ -634,7 +713,7 @@ async def request_hint(payload: HintRequestModel):
         hints_used = sorted(hints_used + [payload.tier])
         await sessions_col.update_one(
             {"team_id": team["team_id"], "round_number": payload.round_number},
-            {"$set": {"hints_used": hints_used}},
+            {"$set": {"hints_used": hints_used, "last_updated_at": datetime.now(timezone.utc)}},
             upsert=True
         )
 
@@ -721,6 +800,6 @@ async def submit_quiz(payload: SubmitQuizRequest):
     await submissions_col.insert_one(record)
     await sessions_col.update_one(
         {"team_id": team["team_id"], "round_number": payload.round_number},
-        {"$set": {"status": "SUBMITTED"}}
+        {"$set": {"status": "SUBMITTED", "last_updated_at": now}}
     )
     return {"status": "success", "score": score, "hint_penalty": hint_penalty, "team_id": team["team_id"]}
