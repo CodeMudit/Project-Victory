@@ -1,4 +1,5 @@
 import os
+import re
 import secrets
 import string
 from datetime import datetime, timezone, timedelta
@@ -36,7 +37,7 @@ round_state_col = db["round_state"]
 sessions_col = db["sessions"]
 system_config_col = db["system_config"]
 
-# --- Static Frontend Serving ---
+# --- Static File Serving ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -151,9 +152,30 @@ def generate_random_password(length=6):
     return ''.join(secrets.choice(chars) for _ in range(length))
 
 def normalize_text(text: str) -> str:
-    return "".join(text.lower().split())
+    """Strips all spaces, punctuation, dashes, and symbols."""
+    if not text:
+        return ""
+    return re.sub(r'[^a-zA-Z0-9]', '', str(text).lower())
+
+def is_answer_correct(user_ans: str, correct_ans: str) -> bool:
+    """Evaluates flexible equivalence for fill-in-the-blank and MCQ choices."""
+    u = str(user_ans).strip()
+    c = str(correct_ans).strip()
+    
+    if u.upper() == c.upper():
+        return True
+    
+    norm_u = normalize_text(u)
+    norm_c = normalize_text(c)
+    if norm_u and norm_u == norm_c:
+        return True
+        
+    norm_u_no_zeros = re.sub(r'\b0+(\d+)', r'\1', norm_u)
+    norm_c_no_zeros = re.sub(r'\b0+(\d+)', r'\1', norm_c)
+    return bool(norm_u_no_zeros and norm_u_no_zeros == norm_c_no_zeros)
 
 async def check_and_auto_close_round(round_number: int):
+    """Automatically terminates round clock when all qualified active teams submit."""
     round_doc = await round_state_col.find_one({"round_number": round_number})
     if not round_doc or not round_doc.get("is_open"):
         return
@@ -211,7 +233,7 @@ async def authenticate_team(team_id: str, password: str):
         raise HTTPException(status_code=401, detail="Authentication failed.")
     return team
 
-# --- PUBLIC LEADERBOARD (OPEN ACCESS) ---
+# --- Public Leaderboard Route ---
 
 @app.get("/api/public/leaderboard/{round_number}")
 async def get_public_leaderboard(round_number: int):
@@ -253,7 +275,7 @@ async def get_public_leaderboard(round_number: int):
         "leaderboard": leaderboard
     }
 
-# --- Question APIS ---
+# --- Questions APIS ---
 
 @app.post("/api/admin/questions")
 async def admin_save_questions(payload: SaveRoundQuestionsRequest, x_admin_key: str = Header(None)):
@@ -451,7 +473,7 @@ async def admin_toggle_late_logins(x_admin_key: str = Header(None)):
     )
     return {"status": "success", "allow_late_logins": new_state}
 
-# --- UNIVERSAL RESET SUITE ---
+# --- Universal Reset Suite ---
 
 @app.post("/api/admin/universal-reset")
 async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str = Header(None)):
@@ -477,7 +499,7 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
                 "elimination_reason": ""
             }
         })
-        return {"status": "success", "message": "Submissions cleared. Teams revived to QUALIFIED and OFFLINE."}
+        return {"status": "success", "message": "Submissions cleared. Teams set to QUALIFIED and OFFLINE."}
 
     elif reset_type == "current_round_only":
         r = payload.round_number or 1
@@ -491,7 +513,7 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
                 "elimination_reason": ""
             }
         })
-        return {"status": "success", "message": f"Round {r} logs reset. Teams in Round {r} set to QUALIFIED."}
+        return {"status": "success", "message": f"Round {r} logs reset. Teams set to QUALIFIED."}
 
     elif reset_type == "full_reset_keep_questions":
         await submissions_col.delete_many({})
@@ -533,7 +555,8 @@ async def participant_login(payload: LoginRequest):
     current_round = team.get("current_round", 1)
     sys_conf = await system_config_col.find_one({"config_id": "main"}) or {}
     
-    if sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not team.get("has_logged_in"):
+    # Registration lock strictly checks new teams attempting to enter Round 1 late
+    if current_round == 1 and sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not team.get("has_logged_in"):
         raise HTTPException(status_code=403, detail="Late registrations are currently locked by the administrator.")
 
     existing_sub = await submissions_col.find_one({
@@ -626,10 +649,7 @@ async def submit_quiz(payload: SubmitQuizRequest):
         user_ans = str(payload.answers.get(q_id, "")).strip()
         q_points = q.get("points") or 4
 
-        is_correct = (
-            user_ans.upper() == correct_ans.upper()
-            or normalize_text(user_ans) == normalize_text(correct_ans)
-        )
+        is_correct = is_answer_correct(user_ans, correct_ans)
         if is_correct:
             score += q_points
 
@@ -776,7 +796,7 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
         if idx < payload.top_n_teams:
             await teams_col.update_one(
                 {"team_id": t_id},
-                {"$set": {"current_round": payload.next_round, "status": "QUALIFIED", "elimination_reason": "", "has_logged_in": False}}
+                {"$set": {"current_round": payload.next_round, "status": "QUALIFIED", "elimination_reason": "", "has_logged_in": True}}
             )
             promoted_count += 1
         else:
