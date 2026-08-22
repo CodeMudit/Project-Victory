@@ -36,29 +36,37 @@ round_state_col = db["round_state"]
 sessions_col = db["sessions"]
 system_config_col = db["system_config"]
 
-# --- STATIC FRONTEND FILE SERVING ---
+# --- Static File Serving ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return HTMLResponse("<h1>Index file not found on server</h1>", status_code=404)
+    return HTMLResponse("<h1>index.html not found</h1>", status_code=404)
 
 @app.get("/retro", response_class=HTMLResponse)
 @app.get("/index-retro.html", response_class=HTMLResponse)
 async def serve_retro():
     if os.path.exists("index-retro.html"):
         return FileResponse("index-retro.html")
-    return HTMLResponse("<h1>Retro index file not found</h1>", status_code=404)
+    return HTMLResponse("<h1>index-retro.html not found</h1>", status_code=404)
 
 @app.get("/admin", response_class=HTMLResponse)
 @app.get("/admin.html", response_class=HTMLResponse)
 async def serve_admin():
     if os.path.exists("admin.html"):
         return FileResponse("admin.html")
-    return HTMLResponse("<h1>Admin file not found on server</h1>", status_code=404)
+    return HTMLResponse("<h1>admin.html not found</h1>", status_code=404)
+
+@app.get("/admin-retro", response_class=HTMLResponse)
+@app.get("/admin-retro.html", response_class=HTMLResponse)
+async def serve_admin_retro():
+    if os.path.exists("admin-retro.html"):
+        return FileResponse("admin-retro.html")
+    return HTMLResponse("<h1>admin-retro.html not found</h1>", status_code=404)
 
 # --- Schemas ---
+
 class QuestionModel(BaseModel):
     id: str
     type: str
@@ -121,7 +129,7 @@ class OpenRoundRequest(BaseModel):
     duration_minutes: Optional[int] = 10
 
 class UniversalResetRequest(BaseModel):
-    reset_type: str  # "teams_only", "leaderboard_only", "current_round_only", "full_reset_keep_questions"
+    reset_type: str
     round_number: Optional[int] = 1
 
 def generate_random_password(length=6):
@@ -132,12 +140,10 @@ def normalize_text(text: str) -> str:
     return "".join(text.lower().split())
 
 async def check_and_auto_close_round(round_number: int):
-    """Automatically stop the round clock when all logged-in qualified teams submit."""
     round_doc = await round_state_col.find_one({"round_number": round_number})
     if not round_doc or not round_doc.get("is_open"):
         return
 
-    # Teams qualified in this round that have logged in
     logged_in_teams = await teams_col.find({
         "status": "QUALIFIED",
         "current_round": round_number,
@@ -147,7 +153,6 @@ async def check_and_auto_close_round(round_number: int):
     if not logged_in_teams:
         return
 
-    # Check submissions for these specific logged-in teams
     team_ids = [t["team_id"] for t in logged_in_teams]
     submitted_count = await submissions_col.count_documents({
         "round_number": round_number,
@@ -196,7 +201,7 @@ async def authenticate_team(team_id: str, password: str):
         raise HTTPException(status_code=401, detail="Authentication failed.")
     return team
 
-# --- QUESTIONS APIS ---
+# --- Question APIS ---
 
 @app.post("/api/admin/questions")
 async def admin_save_questions(payload: SaveRoundQuestionsRequest, x_admin_key: str = Header(None)):
@@ -258,7 +263,7 @@ async def get_questions_for_round(round_number: int):
         "briefing": doc.get("briefing", "")
     }
 
-# --- GATE & TOURNAMENT FLOW ---
+# --- Gate & Tournament Controls ---
 
 @app.get("/api/round/{round_number}/status")
 async def get_round_status(round_number: int):
@@ -273,10 +278,8 @@ async def admin_open_round(round_number: int, payload: OpenRoundRequest = None, 
     duration = payload.duration_minutes if payload and payload.duration_minutes else 10
     opened_at = datetime.now(timezone.utc)
     
-    # Close any other open round clock first
     await round_state_col.update_many({"round_number": {"$ne": round_number}}, {"$set": {"is_open": False}})
     
-    # Mark Round 1 as started globally to lock unregistered/late logins
     if round_number == 1:
         await system_config_col.update_one(
             {"config_id": "main"},
@@ -309,7 +312,7 @@ async def admin_close_round(round_number: int, x_admin_key: str = Header(None)):
     )
     return {"status": "success", "round_number": round_number, "is_open": False}
 
-# --- BULK CREATION & ANALYTICS ---
+# --- Bulk Creation & Analytics ---
 
 @app.post("/api/admin/create-teams-bulk")
 async def admin_create_teams_bulk(payload: CreateTeamsBulkRequest, x_admin_key: str = Header(None)):
@@ -358,7 +361,6 @@ async def admin_get_analytics(x_admin_key: str = Header(None)):
     total_teams = await teams_col.count_documents({})
     logged_in_teams = await teams_col.count_documents({"is_logged_in": True})
     
-    # Submissions and eliminations across rounds
     rounds_data = {}
     for r in range(1, 5):
         qualified = await teams_col.count_documents({"status": "QUALIFIED", "current_round": r})
@@ -395,7 +397,7 @@ async def admin_toggle_late_logins(x_admin_key: str = Header(None)):
     )
     return {"status": "success", "allow_late_logins": not curr}
 
-# --- UNIVERSAL GRANULAR RESET ---
+# --- Universal Reset ---
 
 @app.post("/api/admin/universal-reset")
 async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str = Header(None)):
@@ -409,11 +411,11 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
         await sessions_col.delete_many({})
         await submissions_col.delete_many({})
         await system_config_col.delete_many({})
-        return {"status": "success", "message": "All participant teams and credentials deleted."}
+        return {"status": "success", "message": "All teams deleted."}
 
     elif reset_type == "leaderboard_only":
         await submissions_col.delete_many({})
-        return {"status": "success", "message": "Submissions and leaderboard history cleared."}
+        return {"status": "success", "message": "Leaderboard submissions reset."}
 
     elif reset_type == "current_round_only":
         r = payload.round_number or 1
@@ -421,7 +423,7 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
         await sessions_col.delete_many({"round_number": r})
         await round_state_col.update_one({"round_number": r}, {"$set": {"is_open": False}}, upsert=True)
         await teams_col.update_many({"current_round": r}, {"$set": {"status": "QUALIFIED"}})
-        return {"status": "success", "message": f"Round {r} logs and scores reset."}
+        return {"status": "success", "message": f"Round {r} logs reset."}
 
     elif reset_type == "full_reset_keep_questions":
         await teams_col.delete_many({})
@@ -433,11 +435,11 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
             {"$set": {"r1_started": False, "allow_late_logins": False}},
             upsert=True
         )
-        return {"status": "success", "message": "Full tournament reset executed. Question banks preserved."}
+        return {"status": "success", "message": "All tournament data reset. Question banks preserved."}
 
-    raise HTTPException(status_code=400, detail="Invalid reset_type parameter.")
+    raise HTTPException(status_code=400, detail="Invalid reset type.")
 
-# --- PARTICIPANT AUTH WITH HARD LOGIN & FULLSCREEN LOGOUT ---
+# --- Participant Login & Session ---
 
 @app.post("/api/auth/login")
 async def participant_login(payload: LoginRequest):
@@ -452,14 +454,9 @@ async def participant_login(payload: LoginRequest):
     if team.get("status") == "ELIMINATED":
         raise HTTPException(status_code=403, detail="Notice: Your team has been eliminated.")
 
-    # Late Registration Lockout Check
     sys_conf = await system_config_col.find_one({"config_id": "main"}) or {}
     if sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not team.get("is_logged_in"):
-        raise HTTPException(status_code=403, detail="Tournament underway. New node logins are currently locked by the administrator.")
-
-    # Active Session Lock
-    if team.get("is_logged_in"):
-        raise HTTPException(status_code=409, detail="Active session detected on another device/browser. Logout from existing node first.")
+        raise HTTPException(status_code=403, detail="Late logins are locked by admin.")
 
     current_round = team.get("current_round", 1)
 
@@ -472,11 +469,11 @@ async def participant_login(payload: LoginRequest):
 
     round_doc = await round_state_col.find_one({"round_number": current_round})
     round_status = serialize_round_state(round_doc)
+
+    await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"is_logged_in": True}})
+
     if not round_status["is_open"]:
         raise HTTPException(status_code=423, detail=f"Round {current_round} is currently LOCKED by admin.")
-
-    # Lock session to this device
-    await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"is_logged_in": True}})
 
     session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": current_round})
     if session and session.get("status") == "ACTIVE":
@@ -522,16 +519,16 @@ async def participant_login(payload: LoginRequest):
 async def participant_logout(payload: LogoutRequest):
     team = await authenticate_team(payload.team_id, payload.password)
     await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"is_logged_in": False}})
-    return {"status": "success", "message": "Node successfully disconnected."}
+    return {"status": "success"}
 
 @app.post("/api/admin/team/{team_id}/force-logout")
 async def admin_force_logout(team_id: str, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
     await teams_col.update_one({"team_id": team_id.upper()}, {"$set": {"is_logged_in": False}})
-    return {"status": "success", "message": f"Team {team_id} unlocked."}
+    return {"status": "success"}
 
-# --- SUBMISSIONS & PROMOTION ---
+# --- Submissions & Promotes ---
 
 @app.post("/api/submit-quiz")
 async def submit_quiz(payload: SubmitQuizRequest):
@@ -612,9 +609,7 @@ async def submit_quiz(payload: SubmitQuizRequest):
         {"$set": {"status": "SUBMITTED", "last_updated_at": now}}
     )
     
-    # Check if this submission triggers an auto-stop on the universal clock
     await check_and_auto_close_round(payload.round_number)
-
     return {"status": "success", "score": score, "hint_penalty": hint_penalty, "team_id": team["team_id"]}
 
 @app.get("/api/admin/leaderboard/{round_number}")
@@ -714,7 +709,6 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
             )
             eliminated_count += 1
 
-    # Ensure next round starts locked
     await round_state_col.update_one(
         {"round_number": payload.next_round},
         {"$set": {"round_number": payload.next_round, "is_open": False}},
