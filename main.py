@@ -36,7 +36,7 @@ round_state_col = db["round_state"]
 sessions_col = db["sessions"]
 system_config_col = db["system_config"]
 
-# --- Static Frontend Serving ---
+# --- Static File Serving ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -393,6 +393,7 @@ async def admin_create_teams_bulk(payload: CreateTeamsBulkRequest, x_admin_key: 
             "password": password,
             "current_round": 1,
             "status": "QUALIFIED",
+            "elimination_reason": "",
             "has_logged_in": False,
             "created_at": datetime.now(timezone.utc)
         })
@@ -448,7 +449,7 @@ async def admin_toggle_late_logins(x_admin_key: str = Header(None)):
     )
     return {"status": "success", "allow_late_logins": new_state}
 
-# --- Universal Reset (Properly Clears Team Status & Logins) ---
+# --- UNIVERSAL RESET SUITE ---
 
 @app.post("/api/admin/universal-reset")
 async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str = Header(None)):
@@ -462,30 +463,45 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
         await sessions_col.delete_many({})
         await submissions_col.delete_many({})
         await system_config_col.delete_many({})
-        return {"status": "success", "message": "All teams deleted."}
+        return {"status": "success", "message": "All teams and credentials removed."}
 
     elif reset_type == "leaderboard_only":
         await submissions_col.delete_many({})
         await sessions_col.delete_many({})
-        # Reset team login states so they appear offline and qualified
-        await teams_col.update_many({}, {"$set": {"has_logged_in": False, "status": "QUALIFIED"}, "$unset": {"elimination_reason": ""}})
-        return {"status": "success", "message": "Leaderboard submissions and active logins reset."}
+        # Explicit clean reset of team statuses and login state
+        await teams_col.update_many({}, {
+            "$set": {
+                "has_logged_in": False,
+                "status": "QUALIFIED",
+                "elimination_reason": ""
+            }
+        })
+        return {"status": "success", "message": "Submissions cleared. Teams revived to QUALIFIED and OFFLINE."}
 
     elif reset_type == "current_round_only":
         r = payload.round_number or 1
         await submissions_col.delete_many({"round_number": r})
         await sessions_col.delete_many({"round_number": r})
         await round_state_col.update_one({"round_number": r}, {"$set": {"is_open": False}}, upsert=True)
-        await teams_col.update_many({"current_round": r}, {"$set": {"status": "QUALIFIED", "has_logged_in": False}, "$unset": {"elimination_reason": ""}})
-        return {"status": "success", "message": f"Round {r} logs and active statuses reset."}
+        await teams_col.update_many({"current_round": r}, {
+            "$set": {
+                "status": "QUALIFIED",
+                "has_logged_in": False,
+                "elimination_reason": ""
+            }
+        })
+        return {"status": "success", "message": f"Round {r} logs reset. Teams in Round {r} set to QUALIFIED."}
 
     elif reset_type == "full_reset_keep_questions":
         await submissions_col.delete_many({})
         await sessions_col.delete_many({})
-        # Reset all teams back to initial state (Round 1, Qualified, Offline)
         await teams_col.update_many({}, {
-            "$set": {"current_round": 1, "status": "QUALIFIED", "has_logged_in": False},
-            "$unset": {"elimination_reason": ""}
+            "$set": {
+                "current_round": 1,
+                "status": "QUALIFIED",
+                "has_logged_in": False,
+                "elimination_reason": ""
+            }
         })
         await round_state_col.update_many({}, {"$set": {"is_open": False}})
         await system_config_col.update_one(
@@ -493,7 +509,7 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
             {"$set": {"r1_started": False, "allow_late_logins": False}},
             upsert=True
         )
-        return {"status": "success", "message": "Full tournament reset executed. Question banks preserved."}
+        return {"status": "success", "message": "Full tournament reset completed. Question bank preserved."}
 
     raise HTTPException(status_code=400, detail="Invalid reset type.")
 
@@ -510,7 +526,7 @@ async def participant_login(payload: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid Team ID or Access Password.")
 
     if team.get("status") == "ELIMINATED":
-        elim_reason = team.get("elimination_reason", "Score cutoff / Disqualification.")
+        elim_reason = team.get("elimination_reason", "Disqualification / Cutoff")
         raise HTTPException(status_code=403, detail=f"Notice: Your team has been eliminated ({elim_reason}).")
 
     current_round = team.get("current_round", 1)
@@ -526,6 +542,7 @@ async def participant_login(payload: LoginRequest):
     if existing_sub:
         raise HTTPException(status_code=400, detail=f"Already submitted Round {current_round}. Stand by for promotion.")
 
+    # Mark team as logged in immediately
     await teams_col.update_one(
         {"team_id": team["team_id"]},
         {"$set": {"has_logged_in": True, "last_login": datetime.now(timezone.utc)}}
@@ -576,6 +593,12 @@ async def participant_login(payload: LoginRequest):
         "round_duration_minutes": round_status["duration_minutes"],
         "resume": resume
     }
+
+@app.post("/api/auth/logout")
+async def participant_logout(payload: LogoutRequest):
+    team = await authenticate_team(payload.team_id, payload.password)
+    await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"has_logged_in": False}})
+    return {"status": "success"}
 
 # --- Submissions & Promotion ---
 
@@ -753,7 +776,7 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
         if idx < payload.top_n_teams:
             await teams_col.update_one(
                 {"team_id": t_id},
-                {"$set": {"current_round": payload.next_round, "status": "QUALIFIED", "elimination_reason": ""}}
+                {"$set": {"current_round": payload.next_round, "status": "QUALIFIED", "elimination_reason": "", "has_logged_in": False}}
             )
             promoted_count += 1
         else:
