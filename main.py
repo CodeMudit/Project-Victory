@@ -107,6 +107,10 @@ class LoginRequest(BaseModel):
     team_id: str
     password: str
 
+class LogoutRequest(BaseModel):
+    team_id: str
+    password: str
+
 class SessionProgressRequest(BaseModel):
     team_id: str
     password: str
@@ -150,12 +154,10 @@ def normalize_text(text: str) -> str:
     return "".join(text.lower().split())
 
 async def check_and_auto_close_round(round_number: int):
-    """Automatically locks the round clock when all qualified active teams submit."""
     round_doc = await round_state_col.find_one({"round_number": round_number})
     if not round_doc or not round_doc.get("is_open"):
         return
 
-    # Count qualified active teams in this round
     total_eligible = await teams_col.count_documents({
         "status": "QUALIFIED",
         "current_round": round_number
@@ -163,7 +165,6 @@ async def check_and_auto_close_round(round_number: int):
     if total_eligible == 0:
         return
 
-    # Count submitted entries
     total_submitted = await submissions_col.count_documents({
         "round_number": round_number
     })
@@ -447,7 +448,7 @@ async def admin_toggle_late_logins(x_admin_key: str = Header(None)):
     )
     return {"status": "success", "allow_late_logins": new_state}
 
-# --- Universal Reset ---
+# --- Universal Reset (Properly Clears Team Status & Logins) ---
 
 @app.post("/api/admin/universal-reset")
 async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str = Header(None)):
@@ -465,27 +466,34 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
 
     elif reset_type == "leaderboard_only":
         await submissions_col.delete_many({})
-        return {"status": "success", "message": "Leaderboard submissions reset."}
+        await sessions_col.delete_many({})
+        # Reset team login states so they appear offline and qualified
+        await teams_col.update_many({}, {"$set": {"has_logged_in": False, "status": "QUALIFIED"}, "$unset": {"elimination_reason": ""}})
+        return {"status": "success", "message": "Leaderboard submissions and active logins reset."}
 
     elif reset_type == "current_round_only":
         r = payload.round_number or 1
         await submissions_col.delete_many({"round_number": r})
         await sessions_col.delete_many({"round_number": r})
         await round_state_col.update_one({"round_number": r}, {"$set": {"is_open": False}}, upsert=True)
-        await teams_col.update_many({"current_round": r}, {"$set": {"status": "QUALIFIED"}})
-        return {"status": "success", "message": f"Round {r} logs reset."}
+        await teams_col.update_many({"current_round": r}, {"$set": {"status": "QUALIFIED", "has_logged_in": False}, "$unset": {"elimination_reason": ""}})
+        return {"status": "success", "message": f"Round {r} logs and active statuses reset."}
 
     elif reset_type == "full_reset_keep_questions":
-        await teams_col.delete_many({})
         await submissions_col.delete_many({})
         await sessions_col.delete_many({})
+        # Reset all teams back to initial state (Round 1, Qualified, Offline)
+        await teams_col.update_many({}, {
+            "$set": {"current_round": 1, "status": "QUALIFIED", "has_logged_in": False},
+            "$unset": {"elimination_reason": ""}
+        })
         await round_state_col.update_many({}, {"$set": {"is_open": False}})
         await system_config_col.update_one(
             {"config_id": "main"},
             {"$set": {"r1_started": False, "allow_late_logins": False}},
             upsert=True
         )
-        return {"status": "success", "message": "All tournament data reset. Question banks preserved."}
+        return {"status": "success", "message": "Full tournament reset executed. Question banks preserved."}
 
     raise HTTPException(status_code=400, detail="Invalid reset type.")
 
@@ -653,7 +661,6 @@ async def submit_quiz(payload: SubmitQuizRequest):
         {"$set": {"status": "SUBMITTED", "last_updated_at": now}}
     )
     
-    # Check if clock should automatically terminate
     await check_and_auto_close_round(payload.round_number)
     return {"status": "success", "score": score, "hint_penalty": hint_penalty, "team_id": team["team_id"]}
 
