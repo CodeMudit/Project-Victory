@@ -36,7 +36,7 @@ round_state_col = db["round_state"]
 sessions_col = db["sessions"]
 system_config_col = db["system_config"]
 
-# --- Static File Serving ---
+# --- Static Frontend Serving ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -211,7 +211,7 @@ async def authenticate_team(team_id: str, password: str):
         raise HTTPException(status_code=401, detail="Authentication failed.")
     return team
 
-# --- PUBLIC LEADERBOARD ---
+# --- PUBLIC LEADERBOARD (OPEN ACCESS) ---
 
 @app.get("/api/public/leaderboard/{round_number}")
 async def get_public_leaderboard(round_number: int):
@@ -229,13 +229,14 @@ async def get_public_leaderboard(round_number: int):
             "rank": rank,
             "team_id": sub["team_id"],
             "team_name": team_info.get("team_name", "Unknown") if team_info else "Unknown",
-            "score": sub["score"],
+            "score": sub.get("score", 0),
             "time_taken_seconds": sub.get("time_taken_seconds", 0),
             "tab_switch_count": sub.get("tab_switch_count", 0),
             "hints_used": sub.get("hints_used", []),
             "hints_used_count": len(sub.get("hints_used", [])),
             "submission_status": sub.get("submission_status", "NORMAL_COMPLETION"),
-            "status": team_info.get("status", "QUALIFIED") if team_info else "UNKNOWN"
+            "status": team_info.get("status", "QUALIFIED") if team_info else "UNKNOWN",
+            "elimination_reason": team_info.get("elimination_reason", "") if team_info else ""
         })
 
     round_doc = await round_state_col.find_one({"round_number": round_number})
@@ -243,6 +244,7 @@ async def get_public_leaderboard(round_number: int):
     total_reg = await teams_col.count_documents({"status": "QUALIFIED", "current_round": round_number})
 
     return {
+        "status": "success",
         "round": round_number,
         "is_open": round_status["is_open"],
         "remaining_seconds": round_status["remaining_seconds"],
@@ -251,7 +253,7 @@ async def get_public_leaderboard(round_number: int):
         "leaderboard": leaderboard
     }
 
-# --- Questions APIS ---
+# --- Question APIS ---
 
 @app.post("/api/admin/questions")
 async def admin_save_questions(payload: SaveRoundQuestionsRequest, x_admin_key: str = Header(None)):
@@ -468,7 +470,6 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
     elif reset_type == "leaderboard_only":
         await submissions_col.delete_many({})
         await sessions_col.delete_many({})
-        # Explicit clean reset of team statuses and login state
         await teams_col.update_many({}, {
             "$set": {
                 "has_logged_in": False,
@@ -542,7 +543,6 @@ async def participant_login(payload: LoginRequest):
     if existing_sub:
         raise HTTPException(status_code=400, detail=f"Already submitted Round {current_round}. Stand by for promotion.")
 
-    # Mark team as logged in immediately
     await teams_col.update_one(
         {"team_id": team["team_id"]},
         {"$set": {"has_logged_in": True, "last_login": datetime.now(timezone.utc)}}
