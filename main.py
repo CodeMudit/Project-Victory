@@ -149,6 +149,31 @@ def generate_random_password(length=6):
 def normalize_text(text: str) -> str:
     return "".join(text.lower().split())
 
+async def check_and_auto_close_round(round_number: int):
+    """Automatically locks the round clock when all qualified active teams submit."""
+    round_doc = await round_state_col.find_one({"round_number": round_number})
+    if not round_doc or not round_doc.get("is_open"):
+        return
+
+    # Count qualified active teams in this round
+    total_eligible = await teams_col.count_documents({
+        "status": "QUALIFIED",
+        "current_round": round_number
+    })
+    if total_eligible == 0:
+        return
+
+    # Count submitted entries
+    total_submitted = await submissions_col.count_documents({
+        "round_number": round_number
+    })
+
+    if total_submitted >= total_eligible:
+        await round_state_col.update_one(
+            {"round_number": round_number},
+            {"$set": {"is_open": False, "auto_closed_at": datetime.now(timezone.utc)}}
+        )
+
 def serialize_round_state(doc):
     if not doc:
         return {"is_open": False, "opened_at": None, "duration_minutes": 10, "expires_at": None, "remaining_seconds": 0}
@@ -206,6 +231,7 @@ async def get_public_leaderboard(round_number: int):
             "score": sub["score"],
             "time_taken_seconds": sub.get("time_taken_seconds", 0),
             "tab_switch_count": sub.get("tab_switch_count", 0),
+            "hints_used": sub.get("hints_used", []),
             "hints_used_count": len(sub.get("hints_used", [])),
             "submission_status": sub.get("submission_status", "NORMAL_COMPLETION"),
             "status": team_info.get("status", "QUALIFIED") if team_info else "UNKNOWN"
@@ -286,7 +312,7 @@ async def get_questions_for_round(round_number: int):
         "briefing": doc.get("briefing", "")
     }
 
-# --- Gate & Tournament Controls ---
+# --- Gate Controls ---
 
 @app.get("/api/round/{round_number}/status")
 async def get_round_status(round_number: int):
@@ -476,13 +502,12 @@ async def participant_login(payload: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid Team ID or Access Password.")
 
     if team.get("status") == "ELIMINATED":
-        raise HTTPException(status_code=403, detail="Notice: Your team has been eliminated.")
+        elim_reason = team.get("elimination_reason", "Score cutoff / Disqualification.")
+        raise HTTPException(status_code=403, detail=f"Notice: Your team has been eliminated ({elim_reason}).")
 
     current_round = team.get("current_round", 1)
-
     sys_conf = await system_config_col.find_one({"config_id": "main"}) or {}
     
-    # Check if late login is blocked
     if sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not team.get("has_logged_in"):
         raise HTTPException(status_code=403, detail="Late registrations are currently locked by the administrator.")
 
@@ -493,7 +518,6 @@ async def participant_login(payload: LoginRequest):
     if existing_sub:
         raise HTTPException(status_code=400, detail=f"Already submitted Round {current_round}. Stand by for promotion.")
 
-    # Mark team as logged in immediately in the database
     await teams_col.update_one(
         {"team_id": team["team_id"]},
         {"$set": {"has_logged_in": True, "last_login": datetime.now(timezone.utc)}}
@@ -501,7 +525,6 @@ async def participant_login(payload: LoginRequest):
 
     round_doc = await round_state_col.find_one({"round_number": current_round})
     round_status = serialize_round_state(round_doc)
-
     session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": current_round})
 
     if not round_status["is_open"]:
@@ -546,7 +569,7 @@ async def participant_login(payload: LoginRequest):
         "resume": resume
     }
 
-# --- Submissions & Promotes ---
+# --- Submissions & Promotion ---
 
 @app.post("/api/submit-quiz")
 async def submit_quiz(payload: SubmitQuizRequest):
@@ -593,7 +616,10 @@ async def submit_quiz(payload: SubmitQuizRequest):
     score = max(0, score - hint_penalty)
 
     if payload.submission_status in ["DISQUALIFIED", "TERMINATED_DUE_TO_TAB_SWITCHING"]:
-        await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"status": "ELIMINATED"}})
+        await teams_col.update_one(
+            {"team_id": team["team_id"]},
+            {"$set": {"status": "ELIMINATED", "elimination_reason": payload.submission_status}}
+        )
 
     round_doc = await round_state_col.find_one({"round_number": payload.round_number})
     now = datetime.now(timezone.utc)
@@ -626,6 +652,9 @@ async def submit_quiz(payload: SubmitQuizRequest):
         {"team_id": team["team_id"], "round_number": payload.round_number},
         {"$set": {"status": "SUBMITTED", "last_updated_at": now}}
     )
+    
+    # Check if clock should automatically terminate
+    await check_and_auto_close_round(payload.round_number)
     return {"status": "success", "score": score, "hint_penalty": hint_penalty, "team_id": team["team_id"]}
 
 @app.get("/api/admin/leaderboard/{round_number}")
@@ -654,6 +683,7 @@ async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(Non
             "hints_used": sub.get("hints_used", []),
             "submission_status": sub.get("submission_status", "NORMAL_COMPLETION"),
             "status": team_info.get("status", "QUALIFIED") if team_info else "UNKNOWN",
+            "elimination_reason": team_info.get("elimination_reason", "") if team_info else "",
             "current_round": team_info.get("current_round", 1) if team_info else 1,
             "submitted_at_local": sub.get("submitted_at_local", "")
         })
@@ -679,13 +709,14 @@ async def admin_list_teams(x_admin_key: str = Header(None)):
 
     result = []
     for t in teams:
-        session = await sessions_col.find_one({"team_id": t["team_id"], "round_number": t.get("current_round", 1)})
+        session = await sessions_col.find_one({"team_id": t["team_id"]})
         result.append({
             "team_id": t["team_id"],
             "team_name": t.get("team_name", ""),
             "password": t.get("password", ""),
             "current_round": t.get("current_round", 1),
             "status": t.get("status", "QUALIFIED"),
+            "elimination_reason": t.get("elimination_reason", ""),
             "has_logged_in": t.get("has_logged_in", False),
             "session_status": session.get("status", "NOT_STARTED") if session else "NOT_STARTED"
         })
@@ -715,13 +746,13 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
         if idx < payload.top_n_teams:
             await teams_col.update_one(
                 {"team_id": t_id},
-                {"$set": {"current_round": payload.next_round, "status": "QUALIFIED"}}
+                {"$set": {"current_round": payload.next_round, "status": "QUALIFIED", "elimination_reason": ""}}
             )
             promoted_count += 1
         else:
             await teams_col.update_one(
                 {"team_id": t_id},
-                {"$set": {"status": "ELIMINATED"}}
+                {"$set": {"status": "ELIMINATED", "elimination_reason": f"Cutoff at Round {prev_round} (Rank #{idx+1})"}}
             )
             eliminated_count += 1
 
@@ -794,6 +825,7 @@ async def check_team_status(team_id: str):
     return {
         "team_id": team["team_id"],
         "status": team.get("status", "QUALIFIED"),
+        "elimination_reason": team.get("elimination_reason", ""),
         "current_round": current_round,
         "round_open": round_status["is_open"],
         "remaining_seconds": round_status["remaining_seconds"]
