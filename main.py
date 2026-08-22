@@ -80,6 +80,7 @@ async def serve_leaderboard_retro():
     return HTMLResponse("<h1>leaderboard-retro.html not found</h1>", status_code=404)
 
 # --- Schemas ---
+
 class QuestionModel(BaseModel):
     id: str
     type: str
@@ -103,10 +104,6 @@ class CreateTeamsBulkRequest(BaseModel):
     team_names: List[str]
 
 class LoginRequest(BaseModel):
-    team_id: str
-    password: str
-
-class LogoutRequest(BaseModel):
     team_id: str
     password: str
 
@@ -188,7 +185,7 @@ async def authenticate_team(team_id: str, password: str):
         raise HTTPException(status_code=401, detail="Authentication failed.")
     return team
 
-# --- PUBLIC LEADERBOARD (NO AUTH REQUIRED) ---
+# --- PUBLIC LEADERBOARD ---
 
 @app.get("/api/public/leaderboard/{round_number}")
 async def get_public_leaderboard(round_number: int):
@@ -369,6 +366,7 @@ async def admin_create_teams_bulk(payload: CreateTeamsBulkRequest, x_admin_key: 
             "password": password,
             "current_round": 1,
             "status": "QUALIFIED",
+            "has_logged_in": False,
             "created_at": datetime.now(timezone.utc)
         })
         created.append({"team_id": team_id, "team_name": t_name, "password": password})
@@ -384,7 +382,7 @@ async def admin_get_analytics(x_admin_key: str = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
 
     total_teams = await teams_col.count_documents({})
-    logged_in_teams = await sessions_col.count_documents({})
+    logged_in_teams = await teams_col.count_documents({"has_logged_in": True})
     
     rounds_data = {}
     for r in range(1, 5):
@@ -483,9 +481,9 @@ async def participant_login(payload: LoginRequest):
     current_round = team.get("current_round", 1)
 
     sys_conf = await system_config_col.find_one({"config_id": "main"}) or {}
-    session = await sessions_col.find_one({"team_id": team["team_id"]})
     
-    if sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not session:
+    # Check if late login is blocked
+    if sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not team.get("has_logged_in"):
         raise HTTPException(status_code=403, detail="Late registrations are currently locked by the administrator.")
 
     existing_sub = await submissions_col.find_one({
@@ -495,13 +493,21 @@ async def participant_login(payload: LoginRequest):
     if existing_sub:
         raise HTTPException(status_code=400, detail=f"Already submitted Round {current_round}. Stand by for promotion.")
 
+    # Mark team as logged in immediately in the database
+    await teams_col.update_one(
+        {"team_id": team["team_id"]},
+        {"$set": {"has_logged_in": True, "last_login": datetime.now(timezone.utc)}}
+    )
+
     round_doc = await round_state_col.find_one({"round_number": current_round})
     round_status = serialize_round_state(round_doc)
+
+    session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": current_round})
 
     if not round_status["is_open"]:
         raise HTTPException(status_code=423, detail=f"Round {current_round} is currently LOCKED by admin.")
 
-    if session and session.get("status") == "ACTIVE" and session.get("round_number") == current_round:
+    if session and session.get("status") == "ACTIVE":
         resume = {
             "current_index": session.get("current_index", 0),
             "answers": session.get("answers", {}),
@@ -653,7 +659,7 @@ async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(Non
         })
 
     total_registered = await teams_col.count_documents({"status": "QUALIFIED", "current_round": round_number})
-    active_logins = await sessions_col.count_documents({"round_number": round_number})
+    active_logins = await teams_col.count_documents({"status": "QUALIFIED", "current_round": round_number, "has_logged_in": True})
 
     return {
         "round": round_number,
@@ -673,14 +679,14 @@ async def admin_list_teams(x_admin_key: str = Header(None)):
 
     result = []
     for t in teams:
-        session = await sessions_col.find_one({"team_id": t["team_id"]})
+        session = await sessions_col.find_one({"team_id": t["team_id"], "round_number": t.get("current_round", 1)})
         result.append({
             "team_id": t["team_id"],
             "team_name": t.get("team_name", ""),
             "password": t.get("password", ""),
             "current_round": t.get("current_round", 1),
             "status": t.get("status", "QUALIFIED"),
-            "has_logged_in": session is not None,
+            "has_logged_in": t.get("has_logged_in", False),
             "session_status": session.get("status", "NOT_STARTED") if session else "NOT_STARTED"
         })
     return {"status": "success", "total": len(result), "teams": result}
