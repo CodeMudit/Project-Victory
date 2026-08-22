@@ -36,7 +36,7 @@ round_state_col = db["round_state"]
 sessions_col = db["sessions"]
 system_config_col = db["system_config"]
 
-# --- Static File Serving ---
+# --- Static Frontend Serving ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -65,8 +65,21 @@ async def serve_admin_retro():
         return FileResponse("admin-retro.html")
     return HTMLResponse("<h1>admin-retro.html not found</h1>", status_code=404)
 
-# --- Schemas ---
+@app.get("/leaderboard", response_class=HTMLResponse)
+@app.get("/leaderboard.html", response_class=HTMLResponse)
+async def serve_leaderboard():
+    if os.path.exists("leaderboard.html"):
+        return FileResponse("leaderboard.html")
+    return HTMLResponse("<h1>leaderboard.html not found</h1>", status_code=404)
 
+@app.get("/leaderboard-retro", response_class=HTMLResponse)
+@app.get("/leaderboard-retro.html", response_class=HTMLResponse)
+async def serve_leaderboard_retro():
+    if os.path.exists("leaderboard-retro.html"):
+        return FileResponse("leaderboard-retro.html")
+    return HTMLResponse("<h1>leaderboard-retro.html not found</h1>", status_code=404)
+
+# --- Schemas ---
 class QuestionModel(BaseModel):
     id: str
     type: str
@@ -139,32 +152,6 @@ def generate_random_password(length=6):
 def normalize_text(text: str) -> str:
     return "".join(text.lower().split())
 
-async def check_and_auto_close_round(round_number: int):
-    round_doc = await round_state_col.find_one({"round_number": round_number})
-    if not round_doc or not round_doc.get("is_open"):
-        return
-
-    logged_in_teams = await teams_col.find({
-        "status": "QUALIFIED",
-        "current_round": round_number,
-        "is_logged_in": True
-    }).to_list(length=1000)
-
-    if not logged_in_teams:
-        return
-
-    team_ids = [t["team_id"] for t in logged_in_teams]
-    submitted_count = await submissions_col.count_documents({
-        "round_number": round_number,
-        "team_id": {"$in": team_ids}
-    })
-
-    if submitted_count >= len(logged_in_teams):
-        await round_state_col.update_one(
-            {"round_number": round_number},
-            {"$set": {"is_open": False, "auto_closed_at": datetime.now(timezone.utc)}}
-        )
-
 def serialize_round_state(doc):
     if not doc:
         return {"is_open": False, "opened_at": None, "duration_minutes": 10, "expires_at": None, "remaining_seconds": 0}
@@ -201,7 +188,46 @@ async def authenticate_team(team_id: str, password: str):
         raise HTTPException(status_code=401, detail="Authentication failed.")
     return team
 
-# --- Question APIS ---
+# --- PUBLIC LEADERBOARD (NO AUTH REQUIRED) ---
+
+@app.get("/api/public/leaderboard/{round_number}")
+async def get_public_leaderboard(round_number: int):
+    cursor = submissions_col.find({"round_number": round_number}).sort([
+        ("score", -1),
+        ("time_taken_seconds", 1),
+        ("tab_switch_count", 1)
+    ])
+    submissions = await cursor.to_list(length=500)
+
+    leaderboard = []
+    for rank, sub in enumerate(submissions, start=1):
+        team_info = await teams_col.find_one({"team_id": sub["team_id"]})
+        leaderboard.append({
+            "rank": rank,
+            "team_id": sub["team_id"],
+            "team_name": team_info.get("team_name", "Unknown") if team_info else "Unknown",
+            "score": sub["score"],
+            "time_taken_seconds": sub.get("time_taken_seconds", 0),
+            "tab_switch_count": sub.get("tab_switch_count", 0),
+            "hints_used_count": len(sub.get("hints_used", [])),
+            "submission_status": sub.get("submission_status", "NORMAL_COMPLETION"),
+            "status": team_info.get("status", "QUALIFIED") if team_info else "UNKNOWN"
+        })
+
+    round_doc = await round_state_col.find_one({"round_number": round_number})
+    round_status = serialize_round_state(round_doc)
+    total_reg = await teams_col.count_documents({"status": "QUALIFIED", "current_round": round_number})
+
+    return {
+        "round": round_number,
+        "is_open": round_status["is_open"],
+        "remaining_seconds": round_status["remaining_seconds"],
+        "total_registered": total_reg,
+        "total_submitted": len(submissions),
+        "leaderboard": leaderboard
+    }
+
+# --- Questions APIS ---
 
 @app.post("/api/admin/questions")
 async def admin_save_questions(payload: SaveRoundQuestionsRequest, x_admin_key: str = Header(None)):
@@ -283,7 +309,7 @@ async def admin_open_round(round_number: int, payload: OpenRoundRequest = None, 
     if round_number == 1:
         await system_config_col.update_one(
             {"config_id": "main"},
-            {"$set": {"r1_started": True, "allow_late_logins": False}},
+            {"$set": {"r1_started": True}},
             upsert=True
         )
 
@@ -343,7 +369,6 @@ async def admin_create_teams_bulk(payload: CreateTeamsBulkRequest, x_admin_key: 
             "password": password,
             "current_round": 1,
             "status": "QUALIFIED",
-            "is_logged_in": False,
             "created_at": datetime.now(timezone.utc)
         })
         created.append({"team_id": team_id, "team_name": t_name, "password": password})
@@ -359,7 +384,7 @@ async def admin_get_analytics(x_admin_key: str = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
 
     total_teams = await teams_col.count_documents({})
-    logged_in_teams = await teams_col.count_documents({"is_logged_in": True})
+    logged_in_teams = await sessions_col.count_documents({})
     
     rounds_data = {}
     for r in range(1, 5):
@@ -390,12 +415,13 @@ async def admin_toggle_late_logins(x_admin_key: str = Header(None)):
 
     conf = await system_config_col.find_one({"config_id": "main"}) or {}
     curr = conf.get("allow_late_logins", False)
+    new_state = not curr
     await system_config_col.update_one(
         {"config_id": "main"},
-        {"$set": {"allow_late_logins": not curr}},
+        {"$set": {"allow_late_logins": new_state}},
         upsert=True
     )
-    return {"status": "success", "allow_late_logins": not curr}
+    return {"status": "success", "allow_late_logins": new_state}
 
 # --- Universal Reset ---
 
@@ -454,11 +480,13 @@ async def participant_login(payload: LoginRequest):
     if team.get("status") == "ELIMINATED":
         raise HTTPException(status_code=403, detail="Notice: Your team has been eliminated.")
 
-    sys_conf = await system_config_col.find_one({"config_id": "main"}) or {}
-    if sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not team.get("is_logged_in"):
-        raise HTTPException(status_code=403, detail="Late logins are locked by admin.")
-
     current_round = team.get("current_round", 1)
+
+    sys_conf = await system_config_col.find_one({"config_id": "main"}) or {}
+    session = await sessions_col.find_one({"team_id": team["team_id"]})
+    
+    if sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not session:
+        raise HTTPException(status_code=403, detail="Late registrations are currently locked by the administrator.")
 
     existing_sub = await submissions_col.find_one({
         "team_id": team["team_id"],
@@ -470,13 +498,10 @@ async def participant_login(payload: LoginRequest):
     round_doc = await round_state_col.find_one({"round_number": current_round})
     round_status = serialize_round_state(round_doc)
 
-    await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"is_logged_in": True}})
-
     if not round_status["is_open"]:
         raise HTTPException(status_code=423, detail=f"Round {current_round} is currently LOCKED by admin.")
 
-    session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": current_round})
-    if session and session.get("status") == "ACTIVE":
+    if session and session.get("status") == "ACTIVE" and session.get("round_number") == current_round:
         resume = {
             "current_index": session.get("current_index", 0),
             "answers": session.get("answers", {}),
@@ -514,19 +539,6 @@ async def participant_login(payload: LoginRequest):
         "round_duration_minutes": round_status["duration_minutes"],
         "resume": resume
     }
-
-@app.post("/api/auth/logout")
-async def participant_logout(payload: LogoutRequest):
-    team = await authenticate_team(payload.team_id, payload.password)
-    await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"is_logged_in": False}})
-    return {"status": "success"}
-
-@app.post("/api/admin/team/{team_id}/force-logout")
-async def admin_force_logout(team_id: str, x_admin_key: str = Header(None)):
-    if x_admin_key != ADMIN_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-    await teams_col.update_one({"team_id": team_id.upper()}, {"$set": {"is_logged_in": False}})
-    return {"status": "success"}
 
 # --- Submissions & Promotes ---
 
@@ -574,7 +586,7 @@ async def submit_quiz(payload: SubmitQuizRequest):
     hint_penalty = sum(hint_cost_map.get(t, 0) for t in hints_used)
     score = max(0, score - hint_penalty)
 
-    if payload.submission_status == "DISQUALIFIED":
+    if payload.submission_status in ["DISQUALIFIED", "TERMINATED_DUE_TO_TAB_SWITCHING"]:
         await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"status": "ELIMINATED"}})
 
     round_doc = await round_state_col.find_one({"round_number": payload.round_number})
@@ -608,8 +620,6 @@ async def submit_quiz(payload: SubmitQuizRequest):
         {"team_id": team["team_id"], "round_number": payload.round_number},
         {"$set": {"status": "SUBMITTED", "last_updated_at": now}}
     )
-    
-    await check_and_auto_close_round(payload.round_number)
     return {"status": "success", "score": score, "hint_penalty": hint_penalty, "team_id": team["team_id"]}
 
 @app.get("/api/admin/leaderboard/{round_number}")
@@ -643,7 +653,7 @@ async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(Non
         })
 
     total_registered = await teams_col.count_documents({"status": "QUALIFIED", "current_round": round_number})
-    active_logins = await teams_col.count_documents({"status": "QUALIFIED", "current_round": round_number, "is_logged_in": True})
+    active_logins = await sessions_col.count_documents({"round_number": round_number})
 
     return {
         "round": round_number,
@@ -663,14 +673,14 @@ async def admin_list_teams(x_admin_key: str = Header(None)):
 
     result = []
     for t in teams:
-        session = await sessions_col.find_one({"team_id": t["team_id"], "round_number": t.get("current_round", 1)})
+        session = await sessions_col.find_one({"team_id": t["team_id"]})
         result.append({
             "team_id": t["team_id"],
             "team_name": t.get("team_name", ""),
             "password": t.get("password", ""),
             "current_round": t.get("current_round", 1),
             "status": t.get("status", "QUALIFIED"),
-            "is_logged_in": t.get("is_logged_in", False),
+            "has_logged_in": session is not None,
             "session_status": session.get("status", "NOT_STARTED") if session else "NOT_STARTED"
         })
     return {"status": "success", "total": len(result), "teams": result}
