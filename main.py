@@ -36,6 +36,7 @@ questions_col = db["round_questions"]
 round_state_col = db["round_state"]
 sessions_col = db["sessions"]
 system_config_col = db["system_config"]
+pending_registrations_col = db["pending_registrations"]
 
 # --- Static Frontend File Serving ---
 
@@ -80,7 +81,52 @@ async def serve_leaderboard_retro():
         return FileResponse("leaderboard-retro.html")
     return HTMLResponse("<h1>leaderboard-retro.html not found</h1>", status_code=404)
 
+@app.get("/invite", response_class=HTMLResponse)
+@app.get("/invite.html", response_class=HTMLResponse)
+async def serve_invite():
+    if os.path.exists("invite.html"):
+        return FileResponse("invite.html")
+    return HTMLResponse("<h1>invite.html not found</h1>", status_code=404)
+
+@app.get("/invite_1", response_class=HTMLResponse)
+@app.get("/invite_1.html", response_class=HTMLResponse)
+async def serve_invite_1():
+    if os.path.exists("invite_1.html"):
+        return FileResponse("invite_1.html")
+    return HTMLResponse("<h1>invite_1.html not found</h1>", status_code=404)
+
+@app.get("/register", response_class=HTMLResponse)
+@app.get("/register.html", response_class=HTMLResponse)
+async def serve_register():
+    if os.path.exists("register.html"):
+        return FileResponse("register.html")
+    return HTMLResponse("<h1>register.html not found</h1>", status_code=404)
+
+@app.get("/pending", response_class=HTMLResponse)
+@app.get("/pending.html", response_class=HTMLResponse)
+async def serve_pending():
+    if os.path.exists("pending.html"):
+        return FileResponse("pending.html")
+    return HTMLResponse("<h1>pending.html not found</h1>", status_code=404)
+
 # --- Pydantic Data Models ---
+
+class TeamMemberModel(BaseModel):
+    name: str
+    roll_no: str
+    course: str
+    year: str
+
+class PublicRegistrationRequest(BaseModel):
+    team_name: str
+    leader_name: str
+    leader_phone: str
+    leader_roll: str
+    course: str
+    year: str
+    members: List[TeamMemberModel] = []
+    payer_name: str
+    transaction_ref: Optional[str] = ""
 
 class QuestionModel(BaseModel):
     id: str
@@ -152,6 +198,9 @@ class UniversalResetRequest(BaseModel):
 
 class ForceSubmitRequest(BaseModel):
     reason: Optional[str] = "ADMIN_FORCE_SUBMITTED"
+
+class StatusCheckRequest(BaseModel):
+    phone: str
 
 # --- Utility Functions ---
 
@@ -303,6 +352,235 @@ async def get_public_leaderboard(round_number: int):
             "leaderboard": [],
             "error_detail": str(e)
         }
+
+# --- PUBLIC SELF-REGISTRATION (Pending Approval) ---
+
+@app.post("/api/public/register")
+async def public_register_team(payload: PublicRegistrationRequest):
+    t_name = payload.team_name.strip()
+    l_name = payload.leader_name.strip()
+    l_phone = payload.leader_phone.strip()
+    l_roll = payload.leader_roll.strip()
+    payer = payload.payer_name.strip()
+
+    if not t_name or not l_name or not l_phone or not l_roll or not payer:
+        raise HTTPException(status_code=400, detail="Please fill in all required fields.")
+
+    if len(l_phone) != 10 or not l_phone.isdigit():
+        raise HTTPException(status_code=400, detail="WhatsApp number must be a valid 10-digit number.")
+
+    if len(payload.members) > 3:
+        raise HTTPException(status_code=400, detail="A team can have a maximum of 4 participants (Leader + 3 Members).")
+
+    # Prevent duplicate pending by same phone
+    existing_pending = await pending_registrations_col.find_one({
+        "leader.phone": l_phone,
+        "status": "PENDING"
+    })
+    if existing_pending:
+        raise HTTPException(status_code=400, detail="A pending registration already exists for this phone number. Check status instead.")
+
+    # Also block if already an approved team with this phone
+    existing_team = await teams_col.find_one({"leader.phone": l_phone})
+    if existing_team:
+        raise HTTPException(status_code=400, detail="This phone number is already linked to a registered team.")
+
+    now = datetime.now(timezone.utc)
+    pending_doc = {
+        "team_name": t_name,
+        "leader": {
+            "name": l_name,
+            "phone": l_phone,
+            "roll_no": l_roll,
+            "course": payload.course,
+            "year": payload.year
+        },
+        "members": [m.dict() for m in payload.members],
+        "payment": {
+            "payer_name": payer,
+            "transaction_ref": payload.transaction_ref or "",
+            "amount_inr": 100,
+            "status": "SUBMITTED"
+        },
+        "status": "PENDING",
+        "created_at": now,
+        "created_at_local": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    result = await pending_registrations_col.insert_one(pending_doc)
+
+    return {
+        "status": "pending",
+        "message": "Registration submitted. An admin will verify payment and issue your Team ID & Access Key.",
+        "pending_id": str(result.inserted_id),
+        "team_name": t_name,
+        "phone": l_phone
+    }
+
+@app.post("/api/public/check-status")
+async def public_check_status(payload: StatusCheckRequest):
+    phone = payload.phone.strip()
+    if len(phone) != 10 or not phone.isdigit():
+        raise HTTPException(status_code=400, detail="Enter a valid 10-digit phone number.")
+
+    # Check approved teams first
+    team = await teams_col.find_one({"leader.phone": phone})
+    if team:
+        return {
+            "status": "APPROVED",
+            "team_id": team["team_id"],
+            "password": team["password"],
+            "team_name": team["team_name"],
+            "message": "Your registration is approved. Save these credentials."
+        }
+
+    # Check pending
+    pending = await pending_registrations_col.find_one({
+        "leader.phone": phone,
+        "status": "PENDING"
+    })
+    if pending:
+        return {
+            "status": "PENDING",
+            "team_name": pending["team_name"],
+            "payer_name": pending["payment"]["payer_name"],
+            "submitted_at": pending.get("created_at_local", ""),
+            "message": "Payment verification is still in progress. Please wait for admin approval."
+        }
+
+    # Check rejected
+    rejected = await pending_registrations_col.find_one({
+        "leader.phone": phone,
+        "status": "REJECTED"
+    })
+    if rejected:
+        return {
+            "status": "REJECTED",
+            "team_name": rejected["team_name"],
+            "message": rejected.get("rejection_reason", "Registration was not approved. Contact the organisers.")
+        }
+
+    raise HTTPException(status_code=404, detail="No registration found for this phone number.")
+
+# --- Admin Pending Registration Review ---
+
+@app.get("/api/admin/pending-registrations")
+async def admin_list_pending(x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+
+    cursor = pending_registrations_col.find({"status": "PENDING"}).sort("created_at", -1)
+    items = await cursor.to_list(length=500)
+
+    result = []
+    for p in items:
+        result.append({
+            "id": str(p["_id"]),
+            "team_name": p.get("team_name", ""),
+            "leader_name": p.get("leader", {}).get("name", ""),
+            "leader_phone": p.get("leader", {}).get("phone", ""),
+            "leader_roll": p.get("leader", {}).get("roll_no", ""),
+            "course": p.get("leader", {}).get("course", ""),
+            "year": p.get("leader", {}).get("year", ""),
+            "members": p.get("members", []),
+            "payer_name": p.get("payment", {}).get("payer_name", ""),
+            "transaction_ref": p.get("payment", {}).get("transaction_ref", ""),
+            "submitted_at": p.get("created_at_local", ""),
+            "status": p.get("status", "PENDING")
+        })
+    return {"status": "success", "total": len(result), "pending": result}
+
+@app.post("/api/admin/pending/{pending_id}/approve")
+async def admin_approve_pending(pending_id: str, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+
+    from bson import ObjectId
+    try:
+        oid = ObjectId(pending_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid pending ID.")
+
+    pending = await pending_registrations_col.find_one({"_id": oid, "status": "PENDING"})
+    if not pending:
+        raise HTTPException(status_code=404, detail="Pending registration not found or already processed.")
+
+    # Generate credentials
+    existing_ids = set()
+    cursor = teams_col.find({}, {"team_id": 1})
+    async for doc in cursor:
+        existing_ids.add(doc["team_id"])
+
+    team_id = f"NEX-{''.join(secrets.choice(string.digits) for _ in range(4))}"
+    while team_id in existing_ids:
+        team_id = f"NEX-{''.join(secrets.choice(string.digits) for _ in range(4))}"
+
+    password = generate_random_password(6)
+    now = datetime.now(timezone.utc)
+
+    team_doc = {
+        "team_id": team_id,
+        "team_name": pending["team_name"],
+        "password": password,
+        "current_round": 1,
+        "status": "QUALIFIED",
+        "elimination_reason": "",
+        "has_logged_in": False,
+        "leader": pending.get("leader", {}),
+        "members": pending.get("members", []),
+        "payment": {
+            **pending.get("payment", {}),
+            "status": "VERIFIED",
+            "verified_at": now
+        },
+        "registration_type": "PUBLIC_INVITE",
+        "created_at": now
+    }
+
+    await teams_col.insert_one(team_doc)
+    await pending_registrations_col.update_one(
+        {"_id": oid},
+        {"$set": {
+            "status": "APPROVED",
+            "approved_at": now,
+            "team_id": team_id,
+            "password": password
+        }}
+    )
+
+    return {
+        "status": "success",
+        "team_id": team_id,
+        "password": password,
+        "team_name": pending["team_name"],
+        "message": f"Team {team_id} approved and credentials generated."
+    }
+
+@app.post("/api/admin/pending/{pending_id}/reject")
+async def admin_reject_pending(pending_id: str, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+
+    from bson import ObjectId
+    try:
+        oid = ObjectId(pending_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid pending ID.")
+
+    pending = await pending_registrations_col.find_one({"_id": oid, "status": "PENDING"})
+    if not pending:
+        raise HTTPException(status_code=404, detail="Pending registration not found or already processed.")
+
+    await pending_registrations_col.update_one(
+        {"_id": oid},
+        {"$set": {
+            "status": "REJECTED",
+            "rejection_reason": "Payment not verified / Invalid details",
+            "rejected_at": datetime.now(timezone.utc)
+        }}
+    )
+
+    return {"status": "success", "message": "Registration rejected."}
 
 # --- Admin Question & Hint Manager ---
 
@@ -595,6 +873,7 @@ async def admin_get_analytics(x_admin_key: str = Header(None)):
         }
 
     sys_conf = await system_config_col.find_one({"config_id": "main"}) or {}
+    pending_count = await pending_registrations_col.count_documents({"status": "PENDING"})
 
     return {
         "status": "success",
@@ -602,7 +881,8 @@ async def admin_get_analytics(x_admin_key: str = Header(None)):
         "total_authenticated_logins": logged_in_teams,
         "round_metrics": rounds_data,
         "r1_started": sys_conf.get("r1_started", False),
-        "allow_late_logins": sys_conf.get("allow_late_logins", False)
+        "allow_late_logins": sys_conf.get("allow_late_logins", False),
+        "pending_registrations": pending_count
     }
 
 @app.post("/api/admin/toggle-late-logins")
@@ -916,7 +1196,10 @@ async def admin_list_teams(x_admin_key: str = Header(None)):
             "status": t.get("status", "QUALIFIED"),
             "elimination_reason": t.get("elimination_reason", ""),
             "has_logged_in": t.get("has_logged_in", False),
-            "session_status": session.get("status", "NOT_STARTED") if session else "NOT_STARTED"
+            "session_status": session.get("status", "NOT_STARTED") if session else "NOT_STARTED",
+            "leader": t.get("leader", {}),
+            "payment": t.get("payment", {}),
+            "registration_type": t.get("registration_type", "MANUAL")
         })
     return {"status": "success", "total": len(result), "teams": result}
 
