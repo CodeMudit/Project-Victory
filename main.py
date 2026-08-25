@@ -114,7 +114,7 @@ async def serve_pending():
 class TeamMemberModel(BaseModel):
     name: str
     roll_no: str
-    course: str
+    course: str = "B.Tech"
     year: str
 
 class PublicRegistrationRequest(BaseModel):
@@ -122,11 +122,12 @@ class PublicRegistrationRequest(BaseModel):
     leader_name: str
     leader_phone: str
     leader_roll: str
-    course: str
+    course: str = "B.Tech"
     year: str
     members: List[TeamMemberModel] = []
     payer_name: str
     transaction_ref: Optional[str] = ""
+    payment_screenshot: Optional[str] = ""  # base64 data URL of payment receipt
 
 class QuestionModel(BaseModel):
     id: str
@@ -146,9 +147,6 @@ class SaveRoundQuestionsRequest(BaseModel):
     questions: List[QuestionModel]
     hints: List[HintModel] = []
     briefing: str = ""
-
-class CreateTeamRequest(BaseModel):
-    team_name: str
 
 class CreateTeamsBulkRequest(BaseModel):
     team_names: List[str]
@@ -197,13 +195,16 @@ class UniversalResetRequest(BaseModel):
     round_number: Optional[int] = 1
 
 class StatusCheckRequest(BaseModel):
-    phone: str
+    claim_token: str
 
 # ---------- Utilities ----------
 
 def generate_random_password(length=6):
     chars = string.ascii_uppercase + string.digits
     return ''.join(secrets.choice(chars) for _ in range(length))
+
+def generate_claim_token():
+    return "NX-" + ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
 
 def normalize_text(text: str) -> str:
     if not text:
@@ -249,11 +250,9 @@ def serialize_round_state(doc):
     }
 
 async def assert_round_open(round_number: int):
-    """Hard server-side lock. Raises 423 if the round is closed or expired."""
     doc = await round_state_col.find_one({"round_number": round_number})
     status = serialize_round_state(doc)
     if not status["is_open"]:
-        # Also mark closed in DB if timer expired
         if doc and doc.get("is_open"):
             await round_state_col.update_one(
                 {"round_number": round_number},
@@ -303,9 +302,7 @@ async def get_active_round():
 async def get_public_leaderboard(round_number: int):
     try:
         cursor = submissions_col.find({"round_number": round_number}).sort([
-            ("score", -1),
-            ("time_taken_seconds", 1),
-            ("tab_switch_count", 1)
+            ("score", -1), ("time_taken_seconds", 1), ("tab_switch_count", 1)
         ])
         submissions = await cursor.to_list(length=500)
         leaderboard = []
@@ -328,9 +325,7 @@ async def get_public_leaderboard(round_number: int):
         round_doc = await round_state_col.find_one({"round_number": round_number})
         round_status = serialize_round_state(round_doc)
         total_reg = await teams_col.count_documents({
-            "status": "QUALIFIED",
-            "current_round": round_number,
-            "has_logged_in": True
+            "status": "QUALIFIED", "current_round": round_number, "has_logged_in": True
         })
         return {
             "status": "success",
@@ -343,17 +338,12 @@ async def get_public_leaderboard(round_number: int):
         }
     except Exception as e:
         return {
-            "status": "error",
-            "round": round_number,
-            "is_open": False,
-            "remaining_seconds": 0,
-            "total_registered": 0,
-            "total_submitted": 0,
-            "leaderboard": [],
-            "error_detail": str(e)
+            "status": "error", "round": round_number, "is_open": False,
+            "remaining_seconds": 0, "total_registered": 0, "total_submitted": 0,
+            "leaderboard": [], "error_detail": str(e)
         }
 
-# ---------- Public registration (pending) ----------
+# ---------- Public registration (Claim Key) ----------
 
 @app.post("/api/public/register")
 async def public_register_team(payload: PublicRegistrationRequest):
@@ -362,58 +352,84 @@ async def public_register_team(payload: PublicRegistrationRequest):
     l_phone = payload.leader_phone.strip()
     l_roll = payload.leader_roll.strip()
     payer = payload.payer_name.strip()
+    screenshot = (payload.payment_screenshot or "").strip()
 
     if not t_name or not l_name or not l_phone or not l_roll or not payer:
         raise HTTPException(status_code=400, detail="Please fill in all required fields.")
     if len(l_phone) != 10 or not l_phone.isdigit():
         raise HTTPException(status_code=400, detail="WhatsApp number must be a valid 10-digit number.")
+    if not l_roll.isdigit() or len(l_roll) < 3:
+        raise HTTPException(status_code=400, detail="Roll number must be a valid numeric value (at least 3 digits).")
     if len(payload.members) > 3:
         raise HTTPException(status_code=400, detail="A team can have a maximum of 4 participants (Leader + 3 Members).")
+    for m in payload.members:
+        if not str(m.roll_no).strip().isdigit() or len(str(m.roll_no).strip()) < 3:
+            raise HTTPException(status_code=400, detail="All member roll numbers must be valid numeric values.")
+    if not screenshot or not screenshot.startswith("data:image/"):
+        raise HTTPException(status_code=400, detail="Payment receipt screenshot is required (image upload).")
+    if len(screenshot) > 3_500_000:
+        raise HTTPException(status_code=400, detail="Screenshot too large. Please compress and retry (max ~2.5 MB).")
 
     existing_pending = await pending_registrations_col.find_one({
         "leader.phone": l_phone, "status": "PENDING"
     })
     if existing_pending:
-        raise HTTPException(status_code=400, detail="A pending registration already exists for this phone number. Check status instead.")
+        raise HTTPException(status_code=400, detail="A pending registration already exists for this phone number.")
 
     existing_team = await teams_col.find_one({"leader.phone": l_phone})
     if existing_team:
         raise HTTPException(status_code=400, detail="This phone number is already linked to a registered team.")
 
+    claim_token = generate_claim_token()
+    while await pending_registrations_col.find_one({"claim_token": claim_token}) or \
+          await teams_col.find_one({"claim_token": claim_token}):
+        claim_token = generate_claim_token()
+
     now = datetime.now(timezone.utc)
+    course = "B.Tech"
+    members_clean = []
+    for m in payload.members:
+        md = m.dict()
+        md["course"] = "B.Tech"
+        md["roll_no"] = str(md.get("roll_no", "")).strip()
+        members_clean.append(md)
+
     pending_doc = {
         "team_name": t_name,
         "leader": {
             "name": l_name, "phone": l_phone, "roll_no": l_roll,
-            "course": payload.course, "year": payload.year
+            "course": course, "year": payload.year
         },
-        "members": [m.dict() for m in payload.members],
+        "members": members_clean,
         "payment": {
             "payer_name": payer,
             "transaction_ref": payload.transaction_ref or "",
             "amount_inr": 100,
-            "status": "SUBMITTED"
+            "status": "SUBMITTED",
+            "screenshot": screenshot
         },
         "status": "PENDING",
+        "claim_token": claim_token,
         "created_at": now,
         "created_at_local": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     result = await pending_registrations_col.insert_one(pending_doc)
     return {
         "status": "pending",
-        "message": "Registration submitted. An admin will verify payment and issue your Team ID & Access Key.",
+        "message": "Registration submitted. Save your Claim Key — you will need it to retrieve credentials after admin approval.",
         "pending_id": str(result.inserted_id),
         "team_name": t_name,
-        "phone": l_phone
+        "phone": l_phone,
+        "claim_token": claim_token
     }
 
 @app.post("/api/public/check-status")
 async def public_check_status(payload: StatusCheckRequest):
-    phone = payload.phone.strip()
-    if len(phone) != 10 or not phone.isdigit():
-        raise HTTPException(status_code=400, detail="Enter a valid 10-digit phone number.")
+    token = payload.claim_token.strip().upper()
+    if not token or len(token) < 6:
+        raise HTTPException(status_code=400, detail="Enter a valid Claim Key.")
 
-    team = await teams_col.find_one({"leader.phone": phone})
+    team = await teams_col.find_one({"claim_token": token})
     if team:
         return {
             "status": "APPROVED",
@@ -423,25 +439,28 @@ async def public_check_status(payload: StatusCheckRequest):
             "message": "Your registration is approved. Save these credentials."
         }
 
-    pending = await pending_registrations_col.find_one({"leader.phone": phone, "status": "PENDING"})
+    pending = await pending_registrations_col.find_one({
+        "claim_token": token, "status": "PENDING"
+    })
     if pending:
         return {
             "status": "PENDING",
             "team_name": pending["team_name"],
-            "payer_name": pending["payment"]["payer_name"],
             "submitted_at": pending.get("created_at_local", ""),
-            "message": "Payment verification is still in progress. Please wait for admin approval."
+            "message": "Still waiting for admin payment verification."
         }
 
-    rejected = await pending_registrations_col.find_one({"leader.phone": phone, "status": "REJECTED"})
+    rejected = await pending_registrations_col.find_one({
+        "claim_token": token, "status": "REJECTED"
+    })
     if rejected:
         return {
             "status": "REJECTED",
             "team_name": rejected["team_name"],
-            "message": rejected.get("rejection_reason", "Registration was not approved. Contact the organisers.")
+            "message": rejected.get("rejection_reason", "Registration was not approved.")
         }
 
-    raise HTTPException(status_code=404, detail="No registration found for this phone number.")
+    raise HTTPException(status_code=404, detail="No registration found for this Claim Key.")
 
 # ---------- Admin pending review ----------
 
@@ -453,21 +472,43 @@ async def admin_list_pending(x_admin_key: str = Header(None)):
     items = await cursor.to_list(length=500)
     result = []
     for p in items:
+        payment = p.get("payment", {}) or {}
+        has_ss = bool(payment.get("screenshot"))
         result.append({
             "id": str(p["_id"]),
             "team_name": p.get("team_name", ""),
             "leader_name": p.get("leader", {}).get("name", ""),
             "leader_phone": p.get("leader", {}).get("phone", ""),
             "leader_roll": p.get("leader", {}).get("roll_no", ""),
-            "course": p.get("leader", {}).get("course", ""),
+            "course": p.get("leader", {}).get("course", "B.Tech"),
             "year": p.get("leader", {}).get("year", ""),
             "members": p.get("members", []),
-            "payer_name": p.get("payment", {}).get("payer_name", ""),
-            "transaction_ref": p.get("payment", {}).get("transaction_ref", ""),
+            "payer_name": payment.get("payer_name", ""),
+            "transaction_ref": payment.get("transaction_ref", ""),
             "submitted_at": p.get("created_at_local", ""),
-            "status": p.get("status", "PENDING")
+            "claim_token": p.get("claim_token", ""),
+            "status": p.get("status", "PENDING"),
+            "has_screenshot": has_ss
         })
     return {"status": "success", "total": len(result), "pending": result}
+
+
+@app.get("/api/admin/pending/{pending_id}/screenshot")
+async def admin_get_pending_screenshot(pending_id: str, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+    from bson import ObjectId
+    try:
+        oid = ObjectId(pending_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid pending ID.")
+    pending = await pending_registrations_col.find_one({"_id": oid})
+    if not pending:
+        raise HTTPException(status_code=404, detail="Pending registration not found.")
+    screenshot = (pending.get("payment") or {}).get("screenshot") or ""
+    if not screenshot:
+        raise HTTPException(status_code=404, detail="No payment screenshot attached.")
+    return {"status": "success", "screenshot": screenshot, "team_name": pending.get("team_name", "")}
 
 @app.post("/api/admin/pending/{pending_id}/approve")
 async def admin_approve_pending(pending_id: str, x_admin_key: str = Header(None)):
@@ -504,12 +545,18 @@ async def admin_approve_pending(pending_id: str, x_admin_key: str = Header(None)
         "members": pending.get("members", []),
         "payment": {**pending.get("payment", {}), "status": "VERIFIED", "verified_at": now},
         "registration_type": "PUBLIC_INVITE",
+        "claim_token": pending.get("claim_token", ""),
         "created_at": now
     }
     await teams_col.insert_one(team_doc)
     await pending_registrations_col.update_one(
         {"_id": oid},
-        {"$set": {"status": "APPROVED", "approved_at": now, "team_id": team_id, "password": password}}
+        {"$set": {
+            "status": "APPROVED",
+            "approved_at": now,
+            "team_id": team_id,
+            "password": password
+        }}
     )
     return {
         "status": "success",
@@ -555,7 +602,8 @@ async def admin_save_questions(payload: SaveRoundQuestionsRequest, x_admin_key: 
         "updated_at": datetime.now(timezone.utc)
     }
     await questions_col.update_one({"round_number": payload.round_number}, {"$set": doc}, upsert=True)
-    return {"status": "success", "round": payload.round_number, "question_count": len(payload.questions), "hint_count": len(payload.hints)}
+    return {"status": "success", "round": payload.round_number,
+            "question_count": len(payload.questions), "hint_count": len(payload.hints)}
 
 @app.get("/api/admin/questions/{round_number}")
 async def admin_get_questions(round_number: int, x_admin_key: str = Header(None)):
@@ -574,12 +622,10 @@ async def get_questions_for_round(round_number: int):
     doc = await questions_col.find_one({"round_number": round_number})
     if not doc:
         return {"questions": [], "hints": [], "briefing": ""}
-    safe_questions = []
-    for q in doc.get("questions", []):
-        safe_questions.append({
-            "id": q["id"], "type": q["type"], "text": q["text"],
-            "options": q.get("options", [])
-        })
+    safe_questions = [{
+        "id": q["id"], "type": q["type"], "text": q["text"],
+        "options": q.get("options", [])
+    } for q in doc.get("questions", [])]
     safe_hints = [
         {"tier": h["tier"], "point_cost": h["point_cost"]}
         for h in sorted(doc.get("hints", []), key=lambda h: h["tier"])
@@ -612,10 +658,8 @@ async def admin_open_round(round_number: int, payload: OpenRoundRequest = None, 
     await round_state_col.update_one(
         {"round_number": round_number},
         {"$set": {
-            "round_number": round_number,
-            "is_open": True,
-            "duration_minutes": duration,
-            "opened_at": opened_at
+            "round_number": round_number, "is_open": True,
+            "duration_minutes": duration, "opened_at": opened_at
         }},
         upsert=True
     )
@@ -635,10 +679,8 @@ async def admin_close_round(round_number: int, x_admin_key: str = Header(None)):
 
 @app.post("/api/admin/round/{round_number}/force-submit")
 async def admin_force_submit_round(round_number: int, x_admin_key: str = Header(None)):
-    """Only force-submits teams that have actually logged in. No more ghost teams."""
     if x_admin_key != ADMIN_SECRET_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-
     doc = await questions_col.find_one({"round_number": round_number})
     if not doc:
         raise HTTPException(status_code=400, detail="Round questions missing.")
@@ -646,7 +688,6 @@ async def admin_force_submit_round(round_number: int, x_admin_key: str = Header(
     hint_cost_map = {h["tier"]: h["point_cost"] for h in doc.get("hints", [])}
     now = datetime.now(timezone.utc)
 
-    # CRITICAL FIX: only teams that logged in
     cursor = teams_col.find({
         "status": "QUALIFIED",
         "current_round": round_number,
@@ -657,15 +698,13 @@ async def admin_force_submit_round(round_number: int, x_admin_key: str = Header(
     forced_count = 0
     for team in teams:
         existing_sub = await submissions_col.find_one({
-            "team_id": team["team_id"],
-            "round_number": round_number
+            "team_id": team["team_id"], "round_number": round_number
         })
         if existing_sub:
             continue
 
         session = await sessions_col.find_one({
-            "team_id": team["team_id"],
-            "round_number": round_number
+            "team_id": team["team_id"], "round_number": round_number
         })
         answers = session.get("answers", {}) if session else {}
         tab_switch_count = session.get("tab_switch_count", 0) if session else 0
@@ -682,10 +721,8 @@ async def admin_force_submit_round(round_number: int, x_admin_key: str = Header(
             if is_correct:
                 score += q_points
             detailed_results[q_id] = {
-                "user_answer": user_ans,
-                "correct_answer": correct_ans,
-                "is_correct": is_correct,
-                "points_available": q_points
+                "user_answer": user_ans, "correct_answer": correct_ans,
+                "is_correct": is_correct, "points_available": q_points
             }
 
         hint_penalty = sum(hint_cost_map.get(t, 0) for t in hints_used)
@@ -745,7 +782,7 @@ async def admin_revive_team(team_id: str, x_admin_key: str = Header(None)):
         {"$set": {"status": "QUALIFIED", "elimination_reason": "", "has_logged_in": False}}
     )
     return {"status": "success", "team_id": team["team_id"], "current_round": current_round,
-            "message": "Team revived / force-unlocked. They may log in fresh."}
+            "message": "Team revived / force-unlocked."}
 
 # ---------- Bulk + analytics ----------
 
@@ -759,8 +796,7 @@ async def admin_create_teams_bulk(payload: CreateTeamsBulkRequest, x_admin_key: 
     existing_ids = set()
     async for doc in teams_col.find({}, {"team_id": 1}):
         existing_ids.add(doc["team_id"])
-    created = []
-    new_docs = []
+    created, new_docs = [], []
     for t_name in names:
         team_id = f"NEX-{''.join(secrets.choice(string.digits) for _ in range(4))}"
         while team_id in existing_ids:
@@ -831,7 +867,7 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
         await teams_col.update_many({}, {
             "$set": {"has_logged_in": False, "status": "QUALIFIED", "elimination_reason": ""}
         })
-        return {"status": "success", "message": "Submissions cleared. Teams set to QUALIFIED and OFFLINE."}
+        return {"status": "success", "message": "Submissions cleared."}
     elif reset_type == "current_round_only":
         r = payload.round_number or 1
         await submissions_col.delete_many({"round_number": r})
@@ -840,12 +876,13 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
         await teams_col.update_many({"current_round": r}, {
             "$set": {"status": "QUALIFIED", "has_logged_in": False, "elimination_reason": ""}
         })
-        return {"status": "success", "message": f"Round {r} logs reset. Teams set to QUALIFIED."}
+        return {"status": "success", "message": f"Round {r} logs reset."}
     elif reset_type == "full_reset_keep_questions":
         await submissions_col.delete_many({})
         await sessions_col.delete_many({})
         await teams_col.update_many({}, {
-            "$set": {"current_round": 1, "status": "QUALIFIED", "has_logged_in": False, "elimination_reason": ""}
+            "$set": {"current_round": 1, "status": "QUALIFIED",
+                     "has_logged_in": False, "elimination_reason": ""}
         })
         await round_state_col.update_many({}, {"$set": {"is_open": False}})
         await system_config_col.update_one(
@@ -853,7 +890,7 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
             {"$set": {"r1_started": False, "allow_late_logins": False}},
             upsert=True
         )
-        return {"status": "success", "message": "Full tournament reset completed. Question bank preserved."}
+        return {"status": "success", "message": "Full tournament reset completed."}
     raise HTTPException(status_code=400, detail="Invalid reset type.")
 
 # ---------- Auth ----------
@@ -872,7 +909,8 @@ async def participant_login(payload: LoginRequest):
 
     current_round = team.get("current_round", 1)
     sys_conf = await system_config_col.find_one({"config_id": "main"}) or {}
-    if current_round == 1 and sys_conf.get("r1_started") and not sys_conf.get("allow_late_logins") and not team.get("has_logged_in"):
+    if (current_round == 1 and sys_conf.get("r1_started")
+            and not sys_conf.get("allow_late_logins") and not team.get("has_logged_in")):
         raise HTTPException(status_code=403, detail="Late registrations are currently locked by the administrator.")
 
     existing_sub = await submissions_col.find_one({
@@ -913,7 +951,8 @@ async def participant_login(payload: LoginRequest):
             }},
             upsert=True
         )
-        resume = {"current_index": 0, "answers": {}, "tab_switch_count": 0, "warned": False, "hints_used": [], "resumed": False}
+        resume = {"current_index": 0, "answers": {}, "tab_switch_count": 0,
+                  "warned": False, "hints_used": [], "resumed": False}
 
     return {
         "status": "success",
@@ -932,13 +971,11 @@ async def participant_logout(payload: LogoutRequest):
     await teams_col.update_one({"team_id": team["team_id"]}, {"$set": {"has_logged_in": False}})
     return {"status": "success"}
 
-# ---------- Submit / Progress / Hint (all respect round lock) ----------
+# ---------- Submit / Progress / Hint ----------
 
 @app.post("/api/submit-quiz")
 async def submit_quiz(payload: SubmitQuizRequest):
     team = await authenticate_team(payload.team_id, payload.password)
-
-    # HARD LOCK – reject if admin already closed the round
     await assert_round_open(payload.round_number)
 
     existing_sub = await submissions_col.find_one({
@@ -962,13 +999,13 @@ async def submit_quiz(payload: SubmitQuizRequest):
         if is_correct:
             score += q_points
         detailed_results[q_id] = {
-            "user_answer": user_ans,
-            "correct_answer": correct_ans,
-            "is_correct": is_correct,
-            "points_available": q_points
+            "user_answer": user_ans, "correct_answer": correct_ans,
+            "is_correct": is_correct, "points_available": q_points
         }
 
-    session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": payload.round_number})
+    session = await sessions_col.find_one({
+        "team_id": team["team_id"], "round_number": payload.round_number
+    })
     hints_used = session.get("hints_used", []) if session else []
     hint_cost_map = {h["tier"]: h["point_cost"] for h in doc.get("hints", [])}
     hint_penalty = sum(hint_cost_map.get(t, 0) for t in hints_used)
@@ -1016,7 +1053,6 @@ async def submit_quiz(payload: SubmitQuizRequest):
 @app.post("/api/session/progress")
 async def save_session_progress(payload: SessionProgressRequest):
     team = await authenticate_team(payload.team_id, payload.password)
-    # HARD LOCK
     await assert_round_open(payload.round_number)
     await sessions_col.update_one(
         {"team_id": team["team_id"], "round_number": payload.round_number},
@@ -1034,17 +1070,16 @@ async def save_session_progress(payload: SessionProgressRequest):
 @app.post("/api/hint/request")
 async def request_hint(payload: HintRequestModel):
     team = await authenticate_team(payload.team_id, payload.password)
-    # HARD LOCK
     await assert_round_open(payload.round_number)
-
     doc = await questions_col.find_one({"round_number": payload.round_number})
     if not doc:
         raise HTTPException(status_code=404, detail="Question bank not found.")
     hint = next((h for h in doc.get("hints", []) if h["tier"] == payload.tier), None)
     if not hint:
         raise HTTPException(status_code=404, detail="Hint tier not found.")
-
-    session = await sessions_col.find_one({"team_id": team["team_id"], "round_number": payload.round_number})
+    session = await sessions_col.find_one({
+        "team_id": team["team_id"], "round_number": payload.round_number
+    })
     hints_used = session.get("hints_used", []) if session else []
     if payload.tier > 1 and (payload.tier - 1) not in hints_used:
         raise HTTPException(status_code=400, detail="Unlock previous hint tier first.")
@@ -1090,13 +1125,10 @@ async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(Non
     total_registered = await teams_col.count_documents({
         "status": "QUALIFIED", "current_round": round_number, "has_logged_in": True
     })
-    active_logins = await teams_col.count_documents({
-        "status": "QUALIFIED", "current_round": round_number, "has_logged_in": True
-    })
     return {
         "round": round_number,
         "total_registered": total_registered,
-        "active_logins": active_logins,
+        "active_logins": total_registered,
         "total_submitted": len(submissions),
         "leaderboard": leaderboard
     }
@@ -1136,8 +1168,7 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
     ranked_subs = await cursor.to_list(length=300)
     if not ranked_subs:
         raise HTTPException(status_code=400, detail="No submissions found to promote.")
-    promoted_count = 0
-    eliminated_count = 0
+    promoted_count = eliminated_count = 0
     for idx, sub in enumerate(ranked_subs):
         t_id = sub["team_id"]
         if idx < payload.top_n_teams:
