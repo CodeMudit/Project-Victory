@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 
-app = FastAPI(title="Project Nexus Tournament Engine")
+app = FastAPI(title="Level 04 : The Last Login Tournament Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -360,8 +360,8 @@ async def public_register_team(payload: PublicRegistrationRequest):
         raise HTTPException(status_code=400, detail="WhatsApp number must be a valid 10-digit number.")
     if not l_roll.isdigit() or len(l_roll) < 3:
         raise HTTPException(status_code=400, detail="Roll number must be a valid numeric value (at least 3 digits).")
-    if len(payload.members) > 3:
-        raise HTTPException(status_code=400, detail="A team can have a maximum of 4 participants (Leader + 3 Members).")
+    if len(payload.members) > 2:
+        raise HTTPException(status_code=400, detail="A team can have a maximum of 3 participants (Leader + 2 Members).")
     for m in payload.members:
         if not str(m.roll_no).strip().isdigit() or len(str(m.roll_no).strip()) < 3:
             raise HTTPException(status_code=400, detail="All member roll numbers must be valid numeric values.")
