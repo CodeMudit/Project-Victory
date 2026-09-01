@@ -558,11 +558,14 @@ async def admin_approve_pending(pending_id: str, x_admin_key: str = Header(None)
             "password": password
         }}
     )
+    leader_phone = (pending.get("leader") or {}).get("phone", "")
     return {
         "status": "success",
         "team_id": team_id,
         "password": password,
         "team_name": pending["team_name"],
+        "leader_phone": leader_phone,
+        "claim_token": pending.get("claim_token", ""),
         "message": f"Team {team_id} approved and credentials generated."
     }
 
@@ -645,7 +648,7 @@ async def get_round_status(round_number: int):
     return {"round_number": round_number, **serialize_round_state(doc)}
 
 @app.post("/api/admin/round/{round_number}/open")
-async def admin_open_round(round_number: int, payload: OpenRoundRequest = OpenRoundRequest(), x_admin_key: str = Header(None)):
+async def admin_open_round(round_number: int, payload: OpenRoundRequest = None, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
     duration = payload.duration_minutes if payload and payload.duration_minutes else 10
@@ -856,65 +859,42 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
         raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
     reset_type = payload.reset_type
     if reset_type == "teams_only":
-        deleted_teams = (await teams_col.delete_many({})).deleted_count
+        await teams_col.delete_many({})
         await sessions_col.delete_many({})
         await submissions_col.delete_many({})
         await system_config_col.delete_many({})
-        # also clear pending queue so old registrations do not linger
-        try:
-            await pending_registrations_col.delete_many({})
-        except Exception:
-            pass
-        await round_state_col.update_many({}, {"$set": {"is_open": False}})
-        return {
-            "status": "success",
-            "message": f"All teams and credentials removed ({deleted_teams} teams deleted).",
-            "deleted_teams": deleted_teams
-        }
+        return {"status": "success", "message": "All teams and credentials removed."}
     elif reset_type == "leaderboard_only":
-        deleted_subs = (await submissions_col.delete_many({})).deleted_count
+        await submissions_col.delete_many({})
         await sessions_col.delete_many({})
         await teams_col.update_many({}, {
             "$set": {"has_logged_in": False, "status": "QUALIFIED", "elimination_reason": ""}
         })
-        return {
-            "status": "success",
-            "message": f"Submissions cleared ({deleted_subs} rows).",
-            "deleted_submissions": deleted_subs
-        }
+        return {"status": "success", "message": "Submissions cleared."}
     elif reset_type == "current_round_only":
         r = payload.round_number or 1
-        deleted_subs = (await submissions_col.delete_many({"round_number": r})).deleted_count
+        await submissions_col.delete_many({"round_number": r})
         await sessions_col.delete_many({"round_number": r})
         await round_state_col.update_one({"round_number": r}, {"$set": {"is_open": False}}, upsert=True)
-        modified = (await teams_col.update_many({"current_round": r}, {
+        await teams_col.update_many({"current_round": r}, {
             "$set": {"status": "QUALIFIED", "has_logged_in": False, "elimination_reason": ""}
-        })).modified_count
-        return {
-            "status": "success",
-            "message": f"Round {r} logs reset ({deleted_subs} submissions, {modified} teams).",
-            "round_number": r
-        }
+        })
+        return {"status": "success", "message": f"Round {r} logs reset."}
     elif reset_type == "full_reset_keep_questions":
-        deleted_subs = (await submissions_col.delete_many({})).deleted_count
+        await submissions_col.delete_many({})
         await sessions_col.delete_many({})
-        modified = (await teams_col.update_many({}, {
+        await teams_col.update_many({}, {
             "$set": {"current_round": 1, "status": "QUALIFIED",
                      "has_logged_in": False, "elimination_reason": ""}
-        })).modified_count
+        })
         await round_state_col.update_many({}, {"$set": {"is_open": False}})
         await system_config_col.update_one(
             {"config_id": "main"},
             {"$set": {"r1_started": False, "allow_late_logins": False}},
             upsert=True
         )
-        return {
-            "status": "success",
-            "message": f"Full tournament reset completed ({deleted_subs} submissions cleared, {modified} teams reset to R1).",
-            "deleted_submissions": deleted_subs,
-            "teams_reset": modified
-        }
-    raise HTTPException(status_code=400, detail=f"Invalid reset type: {reset_type}")
+        return {"status": "success", "message": "Full tournament reset completed."}
+    raise HTTPException(status_code=400, detail="Invalid reset type.")
 
 # ---------- Auth ----------
 

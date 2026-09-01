@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PROJECT NEXUS // PENDING REGISTRATIONS</title>
+  <title>LEVEL 04 : THE LAST LOGIN // PENDING REGISTRATIONS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
@@ -61,7 +61,7 @@
 <body>
 
   <div id="actionToast">Action Executed Successfully</div>
-  <h1>// PROJECT NEXUS: PENDING WEB REGISTRATIONS</h1>
+  <h1>// LEVEL 04 : THE LAST LOGIN — PENDING REGISTRATIONS</h1>
 
   <div class="meta-row">
     <input type="password" id="adminKey" placeholder="ADMIN SECRET KEY" style="max-width:240px; margin:0;" oninput="localStorage.setItem('nexusAdminKey', this.value)">
@@ -185,6 +185,21 @@
       document.getElementById('ssModalBody').innerHTML = '';
     }
 
+    function buildApprovalWhatsAppUrl(teamId, password, teamName, phone) {
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      if (cleanPhone.length < 10) return null;
+      const withCountry = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+      const msg =
+        `🎉 *LEVEL 04 : THE LAST LOGIN* — Registration Approved!\n\n` +
+        `Team: *${teamName}*\n` +
+        `Team ID: *${teamId}*\n` +
+        `Access Key: *${password}*\n\n` +
+        `Save these credentials. Login when facilitators open the round.\n` +
+        `Contest portal: https://project-victory-production-d780.up.railway.app/\n\n` +
+        `Good luck — beat the level!`;
+      return `https://wa.me/${withCountry}?text=${encodeURIComponent(msg)}`;
+    }
+
     async function approve(id) {
       if (!confirm('Confirm payment received and approve this team? Credentials will be generated instantly.')) return;
       try {
@@ -196,6 +211,14 @@
         if (res.ok) {
           triggerToast(`Approved → ${data.team_id} / ${data.password}`);
           loadPending();
+          const waUrl = buildApprovalWhatsAppUrl(
+            data.team_id, data.password, data.team_name, data.leader_phone
+          );
+          if (waUrl && confirm(
+            `Team approved.\n\nTeam ID: ${data.team_id}\nAccess Key: ${data.password}\n\nOpen WhatsApp to send the credentials message to the team leader now?`
+          )) {
+            window.open(waUrl, '_blank');
+          }
         } else {
           triggerToast(data.detail || 'Approve failed');
         }
