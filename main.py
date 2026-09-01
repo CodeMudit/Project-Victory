@@ -109,6 +109,21 @@ async def serve_pending():
         return FileResponse("pending.html")
     return HTMLResponse("<h1>pending.html not found</h1>", status_code=404)
 
+@app.get("/rules", response_class=HTMLResponse)
+@app.get("/rules.html", response_class=HTMLResponse)
+async def serve_rules():
+    if os.path.exists("rules.html"):
+        return FileResponse("rules.html")
+    return HTMLResponse("<h1>rules.html not found</h1>", status_code=404)
+
+@app.get("/test", response_class=HTMLResponse)
+@app.get("/test-console", response_class=HTMLResponse)
+@app.get("/test-console.html", response_class=HTMLResponse)
+async def serve_test_console():
+    if os.path.exists("test-console.html"):
+        return FileResponse("test-console.html")
+    return HTMLResponse("<h1>test-console.html not found</h1>", status_code=404)
+
 # ---------- Pydantic models ----------
 
 class TeamMemberModel(BaseModel):
@@ -558,11 +573,14 @@ async def admin_approve_pending(pending_id: str, x_admin_key: str = Header(None)
             "password": password
         }}
     )
+    leader_phone = (pending.get("leader") or {}).get("phone", "")
     return {
         "status": "success",
         "team_id": team_id,
         "password": password,
         "team_name": pending["team_name"],
+        "leader_phone": leader_phone,
+        "claim_token": pending.get("claim_token", ""),
         "message": f"Team {team_id} approved and credentials generated."
     }
 
