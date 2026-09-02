@@ -386,11 +386,13 @@ async def public_register_team(payload: PublicRegistrationRequest):
         claim_token = generate_claim_token()
 
     now = datetime.now(timezone.utc)
-    course = "B.Tech"
+    course = (payload.course or "").strip() or "Other"
+    if len(course) > 60:
+        raise HTTPException(status_code=400, detail="Course name is too long.")
     members_clean = []
     for m in payload.members:
         md = m.dict()
-        md["course"] = "B.Tech"
+        md["course"] = (md.get("course") or course or "Other").strip()
         md["roll_no"] = str(md.get("roll_no", "")).strip()
         members_clean.append(md)
 
