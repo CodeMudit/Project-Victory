@@ -3,15 +3,6 @@ import re
 import secrets
 import string
 from datetime import datetime, timezone, timedelta
-try:
-    from zoneinfo import ZoneInfo
-except ImportError:
-    from backports.zoneinfo import ZoneInfo  # type: ignore
-
-IST = ZoneInfo("Asia/Kolkata")
-
-def now_ist_str():
-    return datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -117,13 +108,6 @@ async def serve_pending():
     if os.path.exists("pending.html"):
         return FileResponse("pending.html")
     return HTMLResponse("<h1>pending.html not found</h1>", status_code=404)
-
-@app.get("/teams", response_class=HTMLResponse)
-@app.get("/teams.html", response_class=HTMLResponse)
-async def serve_teams():
-    if os.path.exists("teams.html"):
-        return FileResponse("teams.html")
-    return HTMLResponse("<h1>teams.html not found</h1>", status_code=404)
 
 # ---------- Pydantic models ----------
 
@@ -407,17 +391,11 @@ async def public_register_team(payload: PublicRegistrationRequest):
         claim_token = generate_claim_token()
 
     now = datetime.now(timezone.utc)
-    course = (getattr(payload, "course", None) or "").strip() or "Other"
-    specialization = (getattr(payload, "specialization", None) or "").strip()
-    if len(course) > 60:
-        raise HTTPException(status_code=400, detail="Course name is too long.")
-    if len(specialization) > 80:
-        raise HTTPException(status_code=400, detail="Specialization is too long.")
+    course = "B.Tech"
     members_clean = []
     for m in payload.members:
         md = m.dict()
-        md["course"] = (md.get("course") or course or "Other").strip()
-        md["specialization"] = (md.get("specialization") or "").strip()
+        md["course"] = "B.Tech"
         md["roll_no"] = str(md.get("roll_no", "")).strip()
         members_clean.append(md)
 
@@ -425,7 +403,7 @@ async def public_register_team(payload: PublicRegistrationRequest):
         "team_name": t_name,
         "leader": {
             "name": l_name, "phone": l_phone, "roll_no": l_roll,
-            "course": course, "specialization": specialization, "year": payload.year
+            "course": course, "year": payload.year
         },
         "members": members_clean,
         "payment": {
@@ -438,7 +416,7 @@ async def public_register_team(payload: PublicRegistrationRequest):
         "status": "PENDING",
         "claim_token": claim_token,
         "created_at": now,
-        "created_at_local": now_ist_str()
+        "created_at_local": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     result = await pending_registrations_col.insert_one(pending_doc)
     return {
@@ -1164,78 +1142,6 @@ async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(Non
         "leaderboard": leaderboard
     }
 
-
-# ---------- Public approved teams roster ----------
-
-@app.get("/api/public/approved-teams")
-async def public_approved_teams():
-    """Public roster: approved teams without phone numbers."""
-    cursor = teams_col.find({}).sort("created_at", 1)
-    teams = await cursor.to_list(length=1000)
-    result = []
-    for tdoc in teams:
-        # skip pure bulk credential shells with no leader if desired — still show them
-        leader = tdoc.get("leader") or {}
-        members = tdoc.get("members") or []
-        result.append({
-            "team_id": tdoc.get("team_id", ""),
-            "team_name": tdoc.get("team_name", ""),
-            "status": tdoc.get("status", "QUALIFIED"),
-            "current_round": tdoc.get("current_round", 1),
-            "leader": {
-                "name": leader.get("name", ""),
-                "roll_no": leader.get("roll_no", ""),
-                "course": leader.get("course", ""),
-                "specialization": leader.get("specialization", ""),
-                "year": leader.get("year", "")
-            },
-            "members": [
-                {
-                    "name": m.get("name", ""),
-                    "roll_no": m.get("roll_no", ""),
-                    "course": m.get("course", ""),
-                    "specialization": m.get("specialization", ""),
-                    "year": m.get("year", "")
-                }
-                for m in members
-            ],
-            "registration_type": tdoc.get("registration_type", "MANUAL")
-        })
-    return {"status": "success", "total": len(result), "teams": result}
-
-
-@app.put("/api/admin/team/{team_id}/members")
-async def admin_update_team_members(team_id: str, payload: UpdateTeamMembersRequest, x_admin_key: str = Header(None)):
-    if x_admin_key != ADMIN_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-    tid = team_id.strip().upper()
-    team = await teams_col.find_one({"team_id": tid})
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found.")
-    if len(payload.members) > 2:
-        raise HTTPException(status_code=400, detail="Maximum 2 additional members (3 total with leader).")
-    members_clean = []
-    for m in payload.members:
-        name = (m.name or "").strip()
-        roll = str(m.roll_no or "").strip()
-        if not name or not roll:
-            continue
-        if not roll.isdigit() or len(roll) < 3:
-            raise HTTPException(status_code=400, detail=f"Invalid roll number for member {name}.")
-        members_clean.append({
-            "name": name,
-            "roll_no": roll,
-            "course": (m.course or "").strip() or "Other",
-            "specialization": (m.specialization or "").strip(),
-            "year": str(m.year or "1")
-        })
-    await teams_col.update_one(
-        {"team_id": tid},
-        {"$set": {"members": members_clean, "members_updated_at": datetime.now(timezone.utc)}}
-    )
-    return {"status": "success", "team_id": tid, "members": members_clean, "message": "Team members updated."}
-
-
 @app.get("/api/admin/teams")
 async def admin_list_teams(x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
@@ -1254,11 +1160,55 @@ async def admin_list_teams(x_admin_key: str = Header(None)):
             "elimination_reason": t.get("elimination_reason", ""),
             "has_logged_in": t.get("has_logged_in", False),
             "session_status": session.get("status", "NOT_STARTED") if session else "NOT_STARTED",
-            "leader": t.get("leader", {}),
-            "payment": t.get("payment", {}),
-            "registration_type": t.get("registration_type", "MANUAL")
+            "leader": t.get("leader", {}) or {},
+            "members": t.get("members", []) or [],
+            "payment": t.get("payment", {}) or {},
+            "registration_type": t.get("registration_type", "MANUAL"),
+            "created_at_local": t.get("created_at_local", "")
         })
     return {"status": "success", "total": len(result), "teams": result}
+
+
+@app.delete("/api/admin/team/{team_id}")
+async def admin_delete_team(team_id: str, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+    tid = team_id.strip().upper()
+    team = await teams_col.find_one({"team_id": tid})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found.")
+    await teams_col.delete_one({"team_id": tid})
+    await submissions_col.delete_many({"team_id": tid})
+    await sessions_col.delete_many({"team_id": tid})
+    return {"status": "success", "message": f"Team {tid} deleted.", "team_id": tid}
+
+
+@app.put("/api/admin/team/{team_id}/members")
+async def admin_update_team_members(team_id: str, payload: UpdateTeamMembersRequest, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+    tid = team_id.strip().upper()
+    team = await teams_col.find_one({"team_id": tid})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found.")
+    if len(payload.members) > 2:
+        raise HTTPException(status_code=400, detail="Maximum 2 additional members (3 total with leader).")
+    members_clean = []
+    for m in payload.members:
+        name = (m.name or "").strip()
+        roll = str(m.roll_no or "").strip()
+        if not name or not roll:
+            continue
+        members_clean.append({
+            "name": name,
+            "roll_no": roll,
+            "course": (m.course or "").strip() or "Other",
+            "specialization": (m.specialization or "").strip(),
+            "year": str(m.year or "1")
+        })
+    await teams_col.update_one({"team_id": tid}, {"$set": {"members": members_clean}})
+    return {"status": "success", "team_id": tid, "members": members_clean, "message": "Members updated."}
+
 
 @app.post("/api/admin/promote-teams")
 async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = Header(None)):
