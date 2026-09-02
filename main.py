@@ -109,13 +109,19 @@ async def serve_pending():
         return FileResponse("pending.html")
     return HTMLResponse("<h1>pending.html not found</h1>", status_code=404)
 
+@app.get("/teams", response_class=HTMLResponse)
+@app.get("/teams.html", response_class=HTMLResponse)
+async def serve_teams():
+    if os.path.exists("teams.html"):
+        return FileResponse("teams.html")
+    return HTMLResponse("<h1>teams.html not found</h1>", status_code=404)
+
 # ---------- Pydantic models ----------
 
 class TeamMemberModel(BaseModel):
     name: str
     roll_no: str
     course: str = "B.Tech"
-    specialization: str = ""
     year: str
 
 class PublicRegistrationRequest(BaseModel):
@@ -124,15 +130,11 @@ class PublicRegistrationRequest(BaseModel):
     leader_phone: str
     leader_roll: str
     course: str = "B.Tech"
-    specialization: str = ""
     year: str
     members: List[TeamMemberModel] = []
     payer_name: str
     transaction_ref: Optional[str] = ""
     payment_screenshot: Optional[str] = ""  # base64 data URL of payment receipt
-
-class UpdateTeamMembersRequest(BaseModel):
-    members: List[TeamMemberModel] = []
 
 class QuestionModel(BaseModel):
     id: str
@@ -486,7 +488,6 @@ async def admin_list_pending(x_admin_key: str = Header(None)):
             "leader_phone": p.get("leader", {}).get("phone", ""),
             "leader_roll": p.get("leader", {}).get("roll_no", ""),
             "course": p.get("leader", {}).get("course", "B.Tech"),
-            "specialization": p.get("leader", {}).get("specialization", ""),
             "year": p.get("leader", {}).get("year", ""),
             "members": p.get("members", []),
             "payer_name": payment.get("payer_name", ""),
@@ -1160,55 +1161,11 @@ async def admin_list_teams(x_admin_key: str = Header(None)):
             "elimination_reason": t.get("elimination_reason", ""),
             "has_logged_in": t.get("has_logged_in", False),
             "session_status": session.get("status", "NOT_STARTED") if session else "NOT_STARTED",
-            "leader": t.get("leader", {}) or {},
-            "members": t.get("members", []) or [],
-            "payment": t.get("payment", {}) or {},
-            "registration_type": t.get("registration_type", "MANUAL"),
-            "created_at_local": t.get("created_at_local", "")
+            "leader": t.get("leader", {}),
+            "payment": t.get("payment", {}),
+            "registration_type": t.get("registration_type", "MANUAL")
         })
     return {"status": "success", "total": len(result), "teams": result}
-
-
-@app.delete("/api/admin/team/{team_id}")
-async def admin_delete_team(team_id: str, x_admin_key: str = Header(None)):
-    if x_admin_key != ADMIN_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-    tid = team_id.strip().upper()
-    team = await teams_col.find_one({"team_id": tid})
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found.")
-    await teams_col.delete_one({"team_id": tid})
-    await submissions_col.delete_many({"team_id": tid})
-    await sessions_col.delete_many({"team_id": tid})
-    return {"status": "success", "message": f"Team {tid} deleted.", "team_id": tid}
-
-
-@app.put("/api/admin/team/{team_id}/members")
-async def admin_update_team_members(team_id: str, payload: UpdateTeamMembersRequest, x_admin_key: str = Header(None)):
-    if x_admin_key != ADMIN_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
-    tid = team_id.strip().upper()
-    team = await teams_col.find_one({"team_id": tid})
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found.")
-    if len(payload.members) > 2:
-        raise HTTPException(status_code=400, detail="Maximum 2 additional members (3 total with leader).")
-    members_clean = []
-    for m in payload.members:
-        name = (m.name or "").strip()
-        roll = str(m.roll_no or "").strip()
-        if not name or not roll:
-            continue
-        members_clean.append({
-            "name": name,
-            "roll_no": roll,
-            "course": (m.course or "").strip() or "Other",
-            "specialization": (m.specialization or "").strip(),
-            "year": str(m.year or "1")
-        })
-    await teams_col.update_one({"team_id": tid}, {"$set": {"members": members_clean}})
-    return {"status": "success", "team_id": tid, "members": members_clean, "message": "Members updated."}
-
 
 @app.post("/api/admin/promote-teams")
 async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = Header(None)):
