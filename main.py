@@ -39,89 +39,69 @@ system_config_col = db["system_config"]
 pending_registrations_col = db["pending_registrations"]
 
 # ---------- Static file serving ----------
+STATIC_FILES = [
+    "index.html", "admin.html", "leaderboard.html",
+    "invite.html", "invite_1.html", "register.html",
+    "pending.html", "teams.html", "rules.html"
+]
+
+async def _serve_static(filename: str):
+    if os.path.exists(filename):
+        return FileResponse(filename)
+    return HTMLResponse(f"<h1>{filename} not found</h1>", status_code=404)
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
-    if os.path.exists("index.html"):
-        return FileResponse("index.html")
-    return HTMLResponse("<h1>index.html not found</h1>", status_code=404)
-
-@app.get("/retro", response_class=HTMLResponse)
-@app.get("/index-retro.html", response_class=HTMLResponse)
-async def serve_retro():
-    if os.path.exists("index-retro.html"):
-        return FileResponse("index-retro.html")
-    return HTMLResponse("<h1>index-retro.html not found</h1>", status_code=404)
+    return await _serve_static("index.html")
 
 @app.get("/admin", response_class=HTMLResponse)
 @app.get("/admin.html", response_class=HTMLResponse)
 async def serve_admin():
-    if os.path.exists("admin.html"):
-        return FileResponse("admin.html")
-    return HTMLResponse("<h1>admin.html not found</h1>", status_code=404)
-
-@app.get("/admin-retro", response_class=HTMLResponse)
-@app.get("/admin-retro.html", response_class=HTMLResponse)
-async def serve_admin_retro():
-    if os.path.exists("admin-retro.html"):
-        return FileResponse("admin-retro.html")
-    return HTMLResponse("<h1>admin-retro.html not found</h1>", status_code=404)
+    return await _serve_static("admin.html")
 
 @app.get("/leaderboard", response_class=HTMLResponse)
 @app.get("/leaderboard.html", response_class=HTMLResponse)
 async def serve_leaderboard():
-    if os.path.exists("leaderboard.html"):
-        return FileResponse("leaderboard.html")
-    return HTMLResponse("<h1>leaderboard.html not found</h1>", status_code=404)
-
-@app.get("/leaderboard-retro", response_class=HTMLResponse)
-@app.get("/leaderboard-retro.html", response_class=HTMLResponse)
-async def serve_leaderboard_retro():
-    if os.path.exists("leaderboard-retro.html"):
-        return FileResponse("leaderboard-retro.html")
-    return HTMLResponse("<h1>leaderboard-retro.html not found</h1>", status_code=404)
+    return await _serve_static("leaderboard.html")
 
 @app.get("/invite", response_class=HTMLResponse)
 @app.get("/invite.html", response_class=HTMLResponse)
 async def serve_invite():
-    if os.path.exists("invite.html"):
-        return FileResponse("invite.html")
-    return HTMLResponse("<h1>invite.html not found</h1>", status_code=404)
+    return await _serve_static("invite.html")
 
 @app.get("/invite_1", response_class=HTMLResponse)
 @app.get("/invite_1.html", response_class=HTMLResponse)
 async def serve_invite_1():
-    if os.path.exists("invite_1.html"):
-        return FileResponse("invite_1.html")
-    return HTMLResponse("<h1>invite_1.html not found</h1>", status_code=404)
+    return await _serve_static("invite_1.html")
 
 @app.get("/register", response_class=HTMLResponse)
 @app.get("/register.html", response_class=HTMLResponse)
 async def serve_register():
-    if os.path.exists("register.html"):
-        return FileResponse("register.html")
-    return HTMLResponse("<h1>register.html not found</h1>", status_code=404)
+    return await _serve_static("register.html")
 
 @app.get("/pending", response_class=HTMLResponse)
 @app.get("/pending.html", response_class=HTMLResponse)
 async def serve_pending():
-    if os.path.exists("pending.html"):
-        return FileResponse("pending.html")
-    return HTMLResponse("<h1>pending.html not found</h1>", status_code=404)
+    return await _serve_static("pending.html")
 
 @app.get("/teams", response_class=HTMLResponse)
 @app.get("/teams.html", response_class=HTMLResponse)
 async def serve_teams():
-    if os.path.exists("teams.html"):
-        return FileResponse("teams.html")
-    return HTMLResponse("<h1>teams.html not found</h1>", status_code=404)
+    return await _serve_static("teams.html")
+
+@app.get("/rules", response_class=HTMLResponse)
+@app.get("/rules.html", response_class=HTMLResponse)
+async def serve_rules():
+    return await _serve_static("rules.html")
 
 # ---------- Pydantic models ----------
+# (all models exactly as before – unchanged)
 
 class TeamMemberModel(BaseModel):
     name: str
     roll_no: str
     course: str = "B.Tech"
+    specialization: str = ""
     year: str
 
 class PublicRegistrationRequest(BaseModel):
@@ -130,11 +110,15 @@ class PublicRegistrationRequest(BaseModel):
     leader_phone: str
     leader_roll: str
     course: str = "B.Tech"
+    specialization: str = ""
     year: str
     members: List[TeamMemberModel] = []
     payer_name: str
     transaction_ref: Optional[str] = ""
-    payment_screenshot: Optional[str] = ""  # base64 data URL of payment receipt
+    payment_screenshot: Optional[str] = ""
+
+class UpdateMembersRequest(BaseModel):
+    members: List[TeamMemberModel] = []
 
 class QuestionModel(BaseModel):
     id: str
@@ -205,6 +189,7 @@ class StatusCheckRequest(BaseModel):
     claim_token: str
 
 # ---------- Utilities ----------
+# (all utilities exactly as before – unchanged)
 
 def generate_random_password(length=6):
     chars = string.ascii_uppercase + string.digits
@@ -296,7 +281,6 @@ async def authenticate_team(team_id: str, password: str):
     return team
 
 # ---------- Public leaderboard ----------
-
 @app.get("/api/public/active-round")
 async def get_active_round():
     for r in range(1, 5):
@@ -351,7 +335,6 @@ async def get_public_leaderboard(round_number: int):
         }
 
 # ---------- Public registration (Claim Key) ----------
-
 @app.post("/api/public/register")
 async def public_register_team(payload: PublicRegistrationRequest):
     t_name = payload.team_name.strip()
@@ -393,11 +376,13 @@ async def public_register_team(payload: PublicRegistrationRequest):
         claim_token = generate_claim_token()
 
     now = datetime.now(timezone.utc)
-    course = "B.Tech"
+    course = (payload.course or "").strip() or "B.Tech"
+    specialization = (payload.specialization or "").strip()
     members_clean = []
     for m in payload.members:
         md = m.dict()
-        md["course"] = "B.Tech"
+        md["course"] = (md.get("course") or "").strip() or "B.Tech"
+        md["specialization"] = (md.get("specialization") or "").strip()
         md["roll_no"] = str(md.get("roll_no", "")).strip()
         members_clean.append(md)
 
@@ -405,7 +390,7 @@ async def public_register_team(payload: PublicRegistrationRequest):
         "team_name": t_name,
         "leader": {
             "name": l_name, "phone": l_phone, "roll_no": l_roll,
-            "course": course, "year": payload.year
+            "course": course, "specialization": specialization, "year": payload.year
         },
         "members": members_clean,
         "payment": {
@@ -470,7 +455,6 @@ async def public_check_status(payload: StatusCheckRequest):
     raise HTTPException(status_code=404, detail="No registration found for this Claim Key.")
 
 # ---------- Admin pending review ----------
-
 @app.get("/api/admin/pending-registrations")
 async def admin_list_pending(x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
@@ -488,6 +472,7 @@ async def admin_list_pending(x_admin_key: str = Header(None)):
             "leader_phone": p.get("leader", {}).get("phone", ""),
             "leader_roll": p.get("leader", {}).get("roll_no", ""),
             "course": p.get("leader", {}).get("course", "B.Tech"),
+            "specialization": p.get("leader", {}).get("specialization", ""),
             "year": p.get("leader", {}).get("year", ""),
             "members": p.get("members", []),
             "payer_name": payment.get("payer_name", ""),
@@ -498,7 +483,6 @@ async def admin_list_pending(x_admin_key: str = Header(None)):
             "has_screenshot": has_ss
         })
     return {"status": "success", "total": len(result), "pending": result}
-
 
 @app.get("/api/admin/pending/{pending_id}/screenshot")
 async def admin_get_pending_screenshot(pending_id: str, x_admin_key: str = Header(None)):
@@ -599,7 +583,6 @@ async def admin_reject_pending(pending_id: str, x_admin_key: str = Header(None))
     return {"status": "success", "message": "Registration rejected."}
 
 # ---------- Questions ----------
-
 @app.post("/api/admin/questions")
 async def admin_save_questions(payload: SaveRoundQuestionsRequest, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
@@ -648,7 +631,6 @@ async def get_questions_for_round(round_number: int):
     }
 
 # ---------- Round gate ----------
-
 @app.get("/api/round/{round_number}/status")
 async def get_round_status(round_number: int):
     doc = await round_state_col.find_one({"round_number": round_number})
@@ -795,7 +777,6 @@ async def admin_revive_team(team_id: str, x_admin_key: str = Header(None)):
             "message": "Team revived / force-unlocked."}
 
 # ---------- Bulk + analytics ----------
-
 @app.post("/api/admin/create-teams-bulk")
 async def admin_create_teams_bulk(payload: CreateTeamsBulkRequest, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
@@ -859,7 +840,6 @@ async def admin_toggle_late_logins(x_admin_key: str = Header(None)):
     return {"status": "success", "allow_late_logins": new_state}
 
 # ---------- Universal reset ----------
-
 @app.post("/api/admin/universal-reset")
 async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
@@ -904,7 +884,6 @@ async def admin_universal_reset(payload: UniversalResetRequest, x_admin_key: str
     raise HTTPException(status_code=400, detail="Invalid reset type.")
 
 # ---------- Auth ----------
-
 @app.post("/api/auth/login")
 async def participant_login(payload: LoginRequest):
     team = await teams_col.find_one({
@@ -982,7 +961,6 @@ async def participant_logout(payload: LogoutRequest):
     return {"status": "success"}
 
 # ---------- Submit / Progress / Hint ----------
-
 @app.post("/api/submit-quiz")
 async def submit_quiz(payload: SubmitQuizRequest):
     team = await authenticate_team(payload.team_id, payload.password)
@@ -1103,7 +1081,6 @@ async def request_hint(payload: HintRequestModel):
     return {"status": "success", "tier": hint["tier"], "point_cost": hint["point_cost"], "text": hint["text"]}
 
 # ---------- Admin leaderboard / teams / promote ----------
-
 @app.get("/api/admin/leaderboard/{round_number}")
 async def admin_get_leaderboard(round_number: int, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
@@ -1162,10 +1139,47 @@ async def admin_list_teams(x_admin_key: str = Header(None)):
             "has_logged_in": t.get("has_logged_in", False),
             "session_status": session.get("status", "NOT_STARTED") if session else "NOT_STARTED",
             "leader": t.get("leader", {}),
+            "members": t.get("members", []),
             "payment": t.get("payment", {}),
             "registration_type": t.get("registration_type", "MANUAL")
         })
     return {"status": "success", "total": len(result), "teams": result}
+
+@app.put("/api/admin/team/{team_id}/members")
+async def admin_update_team_members(team_id: str, payload: UpdateMembersRequest, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+    if len(payload.members) > 2:
+        raise HTTPException(status_code=400, detail="A team can have a maximum of 2 additional members.")
+    team = await teams_col.find_one({"team_id": team_id.strip().upper()})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found.")
+    members_clean = []
+    for m in payload.members:
+        md = m.dict()
+        md["roll_no"] = str(md.get("roll_no", "")).strip()
+        md["course"] = (md.get("course") or "").strip() or "B.Tech"
+        md["specialization"] = (md.get("specialization") or "").strip()
+        if md["name"].strip() and md["roll_no"]:
+            members_clean.append(md)
+    await teams_col.update_one(
+        {"team_id": team_id.strip().upper()},
+        {"$set": {"members": members_clean}}
+    )
+    return {"status": "success", "team_id": team_id.strip().upper(), "members": members_clean}
+
+@app.delete("/api/admin/team/{team_id}")
+async def admin_delete_team(team_id: str, x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Access.")
+    tid = team_id.strip().upper()
+    team = await teams_col.find_one({"team_id": tid})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found.")
+    await teams_col.delete_one({"team_id": tid})
+    await sessions_col.delete_many({"team_id": tid})
+    await submissions_col.delete_many({"team_id": tid})
+    return {"status": "success", "message": f"Team {tid} deleted."}
 
 @app.post("/api/admin/promote-teams")
 async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = Header(None)):
