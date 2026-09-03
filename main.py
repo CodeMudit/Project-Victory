@@ -42,7 +42,8 @@ pending_registrations_col = db["pending_registrations"]
 STATIC_FILES = [
     "index.html", "admin.html", "leaderboard.html",
     "invite.html", "invite_1.html", "register.html",
-    "pending.html", "teams.html", "rules.html"
+    "pending.html", "teams.html", "rules.html",
+    "test-index.html", "test-admin.html"   # added test pages
 ]
 
 async def _serve_static(filename: str):
@@ -94,9 +95,17 @@ async def serve_teams():
 async def serve_rules():
     return await _serve_static("rules.html")
 
-# ---------- Pydantic models ----------
-# (all models exactly as before – unchanged)
+@app.get("/test-index", response_class=HTMLResponse)
+@app.get("/test-index.html", response_class=HTMLResponse)
+async def serve_test_index():
+    return await _serve_static("test-index.html")
 
+@app.get("/test-admin", response_class=HTMLResponse)
+@app.get("/test-admin.html", response_class=HTMLResponse)
+async def serve_test_admin():
+    return await _serve_static("test-admin.html")
+
+# ---------- Pydantic models ----------
 class TeamMemberModel(BaseModel):
     name: str
     roll_no: str
@@ -189,8 +198,6 @@ class StatusCheckRequest(BaseModel):
     claim_token: str
 
 # ---------- Utilities ----------
-# (all utilities exactly as before – unchanged)
-
 def generate_random_password(length=6):
     chars = string.ascii_uppercase + string.digits
     return ''.join(secrets.choice(chars) for _ in range(length))
@@ -334,7 +341,7 @@ async def get_public_leaderboard(round_number: int):
             "leaderboard": [], "error_detail": str(e)
         }
 
-# ---------- Public registration (Claim Key) ----------
+# ---------- Public registration ----------
 @app.post("/api/public/register")
 async def public_register_team(payload: PublicRegistrationRequest):
     t_name = payload.team_name.strip()
@@ -1181,6 +1188,7 @@ async def admin_delete_team(team_id: str, x_admin_key: str = Header(None)):
     await submissions_col.delete_many({"team_id": tid})
     return {"status": "success", "message": f"Team {tid} deleted."}
 
+# ---------- FIXED: promote teams ----------
 @app.post("/api/admin/promote-teams")
 async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_SECRET_KEY:
@@ -1193,6 +1201,7 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
     if not ranked_subs:
         raise HTTPException(status_code=400, detail="No submissions found to promote.")
     promoted_count = eliminated_count = 0
+    promoted_ids = []
     for idx, sub in enumerate(ranked_subs):
         t_id = sub["team_id"]
         if idx < payload.top_n_teams:
@@ -1202,6 +1211,7 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
                           "elimination_reason": "", "has_logged_in": True}}
             )
             promoted_count += 1
+            promoted_ids.append(t_id)
         else:
             await teams_col.update_one(
                 {"team_id": t_id},
@@ -1209,6 +1219,18 @@ async def admin_promote_teams(payload: PromoteTeamsRequest, x_admin_key: str = H
                           "elimination_reason": f"Cutoff at Round {prev_round} (Rank #{idx+1})"}}
             )
             eliminated_count += 1
+
+    # NEW: Eliminate all teams that were in this round but did not submit
+    all_teams_in_round = await teams_col.find({"current_round": prev_round}).to_list(None)
+    for team in all_teams_in_round:
+        if team["team_id"] not in promoted_ids:
+            await teams_col.update_one(
+                {"team_id": team["team_id"]},
+                {"$set": {"status": "ELIMINATED",
+                          "elimination_reason": f"Did not submit Round {prev_round}"}}
+            )
+            eliminated_count += 1
+
     await round_state_col.update_one(
         {"round_number": payload.next_round},
         {"$set": {"round_number": payload.next_round, "is_open": False}},
